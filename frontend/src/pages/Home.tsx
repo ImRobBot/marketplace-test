@@ -6,8 +6,10 @@ import ValueStrip from '../components/home/ValueStrip'
 import { useAuth } from '../context/AuthContext'
 import { departments } from '../data/departments'
 import { useCatalogQuery } from '../hooks/useCatalogQuery'
+import { usePagination } from '../hooks/usePagination'
 import { useProducts } from '../hooks/useProducts'
 import { filterProducts } from '../lib/catalog'
+import { DEFAULT_PAGE_SIZE } from '../lib/pagination'
 import type { Feedback, Product } from '../types'
 
 export default function Home() {
@@ -21,6 +23,24 @@ export default function Home() {
     () => filterProducts(products, query),
     [products, query]
   )
+  const {
+    items: paginatedProducts,
+    currentPage,
+    pageSize,
+    setPage,
+  } = usePagination(visibleProducts, {
+    pageSize: DEFAULT_PAGE_SIZE,
+    resetKey: query,
+  })
+
+  const changePage = (page: number): void => {
+    setPage(page)
+    window.setTimeout(() => {
+      document
+        .getElementById('catalogo')
+        ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 0)
+  }
 
   const addToCart = async (product: Product): Promise<void> => {
     setAddingId(product.id)
@@ -50,7 +70,10 @@ export default function Home() {
         onClear={clearSearch}
       />
       <CatalogSection
-        products={visibleProducts}
+        products={paginatedProducts}
+        totalResults={visibleProducts.length}
+        currentPage={currentPage}
+        pageSize={pageSize}
         loading={loading}
         error={error}
         query={query}
@@ -61,6 +84,7 @@ export default function Home() {
         onClear={clearSearch}
         onRetry={retry}
         onAdd={addToCart}
+        onPageChange={changePage}
       />
       <ValueStrip />
     </>

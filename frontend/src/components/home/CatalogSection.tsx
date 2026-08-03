@@ -1,9 +1,13 @@
 import FeedbackNotice from '../common/FeedbackNotice'
+import Pagination from '../common/Pagination'
 import ProductGrid from './ProductGrid'
 import type { Feedback, Product } from '../../types'
 
 interface CatalogSectionProps {
   products: Product[]
+  totalResults: number
+  currentPage: number
+  pageSize: number
   loading: boolean
   error: string
   query: string
@@ -14,10 +18,14 @@ interface CatalogSectionProps {
   onClear: () => void
   onRetry: () => void
   onAdd: (product: Product) => void
+  onPageChange: (page: number) => void
 }
 
 export default function CatalogSection({
   products,
+  totalResults,
+  currentPage,
+  pageSize,
   loading,
   error,
   query,
@@ -27,7 +35,8 @@ export default function CatalogSection({
   onQueryChange,
   onClear,
   onRetry,
-  onAdd
+  onAdd,
+  onPageChange
 }: CatalogSectionProps) {
   return (
     <section id="catalogo" className="page-shell catalog-section" aria-labelledby="catalog-title">
@@ -55,7 +64,7 @@ export default function CatalogSection({
       {!loading && !error && (
         <div className="catalog-status" role="status" aria-live="polite">
           <span>
-            {products.length} {products.length === 1 ? 'resultado' : 'resultados'}
+            {totalResults} {totalResults === 1 ? 'resultado' : 'resultados'}
             {query ? ` para “${query}”` : ''}
           </span>
           {query && <button type="button" onClick={onClear}>Limpiar filtro</button>}
@@ -78,6 +87,15 @@ export default function CatalogSection({
         onRetry={onRetry}
         onAdd={onAdd}
       />
+
+      {!loading && !error && (
+        <Pagination
+          currentPage={currentPage}
+          totalItems={totalResults}
+          pageSize={pageSize}
+          onPageChange={onPageChange}
+        />
+      )}
     </section>
   )
 }
