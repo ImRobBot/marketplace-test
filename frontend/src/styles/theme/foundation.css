@@ -1,0 +1,94 @@
+/*
+ * Marketplace theme
+ * A dense, commercial storefront language with an original Mercado Uno identity.
+ */
+
+:root {
+  color: #172b3a;
+  background: #eaeded;
+  --ink: #172b3a;
+  --ink-soft: #3f4f59;
+  --muted: #68747c;
+  --paper: #eaeded;
+  --surface: #ffffff;
+  --surface-soft: #f3f5f5;
+  --line: #d5d9d9;
+  --line-strong: #b7bfc3;
+  --brand: #172b3a;
+  --brand-hover: #0e202d;
+  --brand-secondary: #243d4e;
+  --accent: #f3b544;
+  --accent-hover: #dda12d;
+  --link: #146c94;
+  --success: #168342;
+  --success-soft: #e9f7ee;
+  --danger: #b12704;
+  --danger-soft: #fff0ec;
+  --shadow-sm: 0 1px 3px rgba(15, 32, 44, 0.12);
+  --shadow-md: 0 10px 28px rgba(15, 32, 44, 0.16);
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+}
+
+html {
+  scroll-padding-top: 166px;
+}
+
+body {
+  color: var(--ink);
+  background: var(--paper);
+  font-size: 15px;
+  line-height: 1.48;
+}
+
+body,
+button,
+input,
+select {
+  font-family: Arial, "Segoe UI", system-ui, sans-serif;
+}
+
+h1,
+h2,
+h3 {
+  letter-spacing: -0.025em;
+  line-height: 1.14;
+}
+
+p {
+  color: var(--ink-soft);
+}
+
+a:hover {
+  color: inherit;
+}
+
+::selection {
+  color: #101820;
+  background: var(--accent);
+}
+
+:focus-visible {
+  outline: 3px solid #ffca62;
+  outline-offset: 2px;
+}
+
+.page-shell {
+  width: min(1420px, calc(100% - 40px));
+}
+
+.page-section {
+  padding-block: 32px 64px;
+}
+
+.app-main {
+  min-width: 0;
+}
+
+.skip-link {
+  color: #172b3a;
+  background: var(--accent);
+  border-radius: 4px;
+  font-weight: 800;
+}

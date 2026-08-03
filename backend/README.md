@@ -9,6 +9,16 @@ npm run dev
 
 `npm run dev` ejecuta `src/index.ts` con recarga automática mediante `tsx`.
 
+## Catálogo de demostración
+
+Para cargar o sincronizar los 100 productos realistas del catálogo local:
+
+```bash
+npm run seed:products
+```
+
+El seed es idempotente, conserva los IDs usados por carritos y órdenes y no reinicia el stock de productos existentes. Los productos nuevos reciben su inventario inicial. No elimina registros ni recrea la base.
+
 ## Compilación y producción
 
 ```bash

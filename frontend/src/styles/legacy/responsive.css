@@ -1,0 +1,260 @@
+@keyframes shimmer {
+  to { transform: translateX(100%); }
+}
+
+@media (max-width: 980px) {
+  .hero {
+    grid-template-columns: 1fr 360px;
+    gap: 42px;
+  }
+
+  .hero__copy h1 {
+    font-size: clamp(3.25rem, 7vw, 5rem);
+  }
+
+  .product-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .product-detail {
+    gap: 42px;
+  }
+
+  .cart-layout {
+    grid-template-columns: minmax(0, 1fr) 300px;
+  }
+
+  .cart-item {
+    grid-template-columns: 105px minmax(0, 1fr);
+  }
+
+  .cart-item__visual .product-visual {
+    height: 105px;
+  }
+
+  .cart-item__controls {
+    grid-column: 2;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .auth-page {
+    grid-template-columns: 1fr 0.9fr;
+  }
+}
+
+@media (max-width: 780px) {
+  .page-shell {
+    width: min(100% - 32px, 680px);
+  }
+
+  .header-inner {
+    flex-wrap: wrap;
+    gap: 10px 18px;
+    padding-block: 11px;
+  }
+
+  .main-nav {
+    order: 3;
+    width: 100%;
+    justify-content: center;
+    margin: 0;
+    padding-top: 8px;
+    border-top: 1px solid var(--line);
+  }
+
+  .header-actions {
+    margin-left: auto;
+  }
+
+  .hero {
+    grid-template-columns: 1fr;
+    padding-block: 54px 64px;
+  }
+
+  .hero__showcase {
+    min-height: 400px;
+  }
+
+  .section-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .search-field {
+    width: 100%;
+    flex-basis: auto;
+  }
+
+  .value-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .value-strip__item {
+    border-right: 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.13);
+  }
+
+  .value-strip__item:last-child {
+    border-bottom: 0;
+  }
+
+  .product-detail {
+    grid-template-columns: 1fr;
+  }
+
+  .product-detail__content {
+    padding-top: 0;
+  }
+
+  .cart-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .order-summary {
+    position: static;
+  }
+
+  .auth-page {
+    grid-template-columns: 1fr;
+    padding-block: 32px 64px;
+  }
+
+  .auth-card {
+    border-radius: var(--radius-md) var(--radius-md) 0 0;
+  }
+
+  .auth-story {
+    min-height: 560px;
+    border-radius: 0 0 var(--radius-md) var(--radius-md);
+  }
+
+  .auth-story__art {
+    margin-bottom: 72px;
+  }
+}
+
+@media (max-width: 560px) {
+  .page-shell {
+    width: min(100% - 24px, 520px);
+  }
+
+  .brand__name,
+  .user-chip__name,
+  .header-login {
+    display: none;
+  }
+
+  .header-actions {
+    gap: 7px;
+  }
+
+  .user-chip {
+    padding-right: 5px;
+  }
+
+  .hero__copy h1 {
+    font-size: clamp(2.8rem, 14vw, 4rem);
+  }
+
+  .hero__actions {
+    flex-direction: column;
+  }
+
+  .hero__actions .button {
+    width: 100%;
+  }
+
+  .hero__showcase {
+    min-height: 345px;
+    border-radius: 28px 28px 28px 8px;
+  }
+
+  .showcase-card {
+    top: 34px;
+    left: 28px;
+  }
+
+  .showcase-card__number {
+    font-size: 6rem;
+  }
+
+  .product-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .product-card__description {
+    min-height: 0;
+  }
+
+  .notice {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .product-detail__purchase {
+    grid-template-columns: 92px 1fr;
+  }
+
+  .product-facts > div {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .product-facts dd {
+    text-align: left;
+  }
+
+  .section-heading--cart {
+    align-items: flex-start;
+  }
+
+  .cart-item {
+    grid-template-columns: 88px minmax(0, 1fr);
+    gap: 14px;
+  }
+
+  .cart-item__visual .product-visual {
+    height: 88px;
+  }
+
+  .cart-item__controls {
+    grid-column: 1 / -1;
+  }
+
+  .auth-card,
+  .auth-story {
+    padding: 34px 24px;
+  }
+
+  .auth-story {
+    min-height: 530px;
+  }
+
+  .footer-inner {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .footer-inner .footer-note {
+    text-align: left;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

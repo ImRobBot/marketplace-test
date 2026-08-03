@@ -1,5 +1,5 @@
-import { getProductMeta } from '../lib/products'
-import type { ProductPreview } from '../types'
+import { getProductMeta } from '../../lib/products'
+import type { ProductPreview } from '../../types'
 
 interface ProductVisualProps {
   product: Pick<ProductPreview, 'id' | 'title'>

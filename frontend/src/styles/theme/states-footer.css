@@ -1,0 +1,98 @@
+/* Empty, loading and footer */
+
+.empty-state--bordered,
+.cart-auth-state {
+  background: #fff;
+  border-color: #d5d9d9;
+  border-radius: 8px;
+  box-shadow: none;
+}
+
+.empty-state__icon {
+  color: var(--brand);
+  background: var(--accent);
+  border-radius: 8px;
+}
+
+.skeleton {
+  background: linear-gradient(90deg, #e7ebec 25%, #f5f7f7 50%, #e7ebec 75%);
+}
+
+.site-footer {
+  margin-top: 0;
+  padding: 0;
+  color: #eaf0f3;
+  background: #132633;
+  border: 0;
+}
+
+.footer-back-to-top {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: #2b4657;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.footer-back-to-top:hover {
+  color: #fff;
+  background: #345466;
+}
+
+.footer-inner {
+  display: grid;
+  grid-template-columns: 1.35fr repeat(3, minmax(140px, 1fr));
+  align-items: start;
+  gap: clamp(28px, 5vw, 72px);
+  padding-block: 46px;
+}
+
+.footer-brand p {
+  max-width: 290px;
+  margin: 17px 0 0;
+  color: #aebdc6;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.brand--footer .brand__mark {
+  color: #172b3a;
+  background: var(--accent);
+}
+
+.footer-column {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  color: #b7c5cc;
+  font-size: 12px;
+}
+
+.footer-column > strong {
+  margin-bottom: 4px;
+  color: #fff;
+  font-size: 13px;
+}
+
+.footer-column a:hover {
+  color: #fff;
+  text-decoration: underline;
+}
+
+.footer-bottom {
+  color: #9fb0b9;
+  background: #0d1c25;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 10px;
+}
+
+.footer-bottom .page-shell {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}

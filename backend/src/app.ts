@@ -17,7 +17,7 @@ export function createApp(): Express {
   });
 
   app.get('/api/products', async (_req, res) => {
-    const products = await Product.findAll();
+    const products = await Product.findAll({ order: [['id', 'ASC']] });
     res.json(products);
   });
 
