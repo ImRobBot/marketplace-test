@@ -1,0 +1,602 @@
+openapi: 3.0.3
+info:
+  title: Mercado Uno API
+  version: 0.1.0
+  description: |
+    Contrato de la API REST del marketplace Mercado Uno.
+
+    La API expone catálogo, autenticación JWT, carrito, checkout simulado y
+    cancelación de órdenes. El checkout no procesa pagos reales: crea la orden
+    directamente con estado `paid` después de validar el inventario.
+  license:
+    name: Uso educativo
+servers:
+  - url: http://localhost:4000
+    description: Servidor local de desarrollo
+tags:
+  - name: Health
+    description: Estado del servicio.
+  - name: Products
+    description: Consulta pública del catálogo.
+  - name: Authentication
+    description: Registro e inicio de sesión.
+  - name: Cart
+    description: Operaciones protegidas sobre el carrito del usuario.
+  - name: Orders
+    description: Checkout simulado y cancelación de órdenes.
+
+paths:
+  /api/health:
+    get:
+      tags:
+        - Health
+      summary: Consultar el estado de la API
+      operationId: getHealth
+      responses:
+        "200":
+          description: La API está disponible.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+              example:
+                ok: true
+
+  /api/products:
+    get:
+      tags:
+        - Products
+      summary: Listar productos
+      description: Devuelve todos los productos existentes. La ruta no implementa paginación ni filtros.
+      operationId: listProducts
+      responses:
+        "200":
+          description: Catálogo completo.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Product"
+              example:
+                - id: 1
+                  title: Producto A
+                  description: null
+                  price: 9.99
+                  stock: 10
+                  createdAt: "2026-07-31T18:00:00.000Z"
+                  updatedAt: "2026-07-31T18:00:00.000Z"
+
+  /api/products/{id}:
+    get:
+      tags:
+        - Products
+      summary: Obtener un producto
+      operationId: getProductById
+      parameters:
+        - $ref: "#/components/parameters/ProductId"
+      responses:
+        "200":
+          description: Producto encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+        "404":
+          description: No existe un producto con el identificador indicado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: Not found
+
+  /api/auth/register:
+    post:
+      tags:
+        - Authentication
+      summary: Registrar un usuario
+      description: Crea un usuario, cifra su contraseña con bcrypt y devuelve un JWT válido durante siete días.
+      operationId: registerUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CredentialsRequest"
+            example:
+              username: demo
+              password: demo-password
+      responses:
+        "200":
+          description: Usuario registrado y autenticado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          description: Faltan campos o el nombre de usuario ya existe.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                missingFields:
+                  summary: Faltan credenciales
+                  value:
+                    error: Missing fields
+                userExists:
+                  summary: Usuario duplicado
+                  value:
+                    error: User exists
+
+  /api/auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: Iniciar sesión
+      description: Valida las credenciales y devuelve un JWT válido durante siete días.
+      operationId: loginUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CredentialsRequest"
+            example:
+              username: demo
+              password: demo-password
+      responses:
+        "200":
+          description: Credenciales válidas.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          description: Credenciales ausentes, inválidas o incorrectas.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: Invalid credentials
+
+  /api/cart:
+    get:
+      tags:
+        - Cart
+      summary: Consultar el carrito
+      operationId: getCart
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Artículos del carrito con el producto asociado.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CartItemDetailed"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags:
+        - Cart
+      summary: Añadir un producto al carrito
+      description: Si el producto ya está en el carrito, acumula la cantidad solicitada.
+      operationId: addCartItem
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CartAddRequest"
+            example:
+              productId: 1
+              qty: 1
+      responses:
+        "200":
+          description: Resumen actualizado del carrito, sin incluir los objetos de producto.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CartItemSummary"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: El producto indicado no existe.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: Product not found
+    put:
+      tags:
+        - Cart
+      summary: Reemplazar la cantidad de un producto
+      operationId: updateCartItem
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CartUpdateRequest"
+            example:
+              productId: 1
+              qty: 2
+      responses:
+        "200":
+          description: Cantidad actualizada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: El producto no está en el carrito del usuario.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: Item not in cart
+
+  /api/cart/{productId}:
+    delete:
+      tags:
+        - Cart
+      summary: Eliminar un producto del carrito
+      description: La operación devuelve éxito aunque el artículo ya no exista en el carrito.
+      operationId: deleteCartItem
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ProductIdForCart"
+      responses:
+        "200":
+          description: Artículo eliminado o previamente ausente.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/checkout:
+    post:
+      tags:
+        - Orders
+      summary: Completar el checkout simulado
+      description: |
+        Valida inventario, calcula el total desde la base de datos, descuenta stock,
+        crea una orden con estado `paid`, copia los precios en los ítems y vacía el
+        carrito dentro de una transacción. No procesa un pago real.
+      operationId: checkoutCart
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Orden simulada creada correctamente.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckoutResponse"
+              example:
+                ok: true
+                orderId: 12
+        "400":
+          description: El carrito está vacío o no existe inventario suficiente.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                emptyCart:
+                  summary: Carrito vacío
+                  value:
+                    error: Cart empty
+                insufficientStock:
+                  summary: Inventario insuficiente
+                  value:
+                    error: Insufficient stock for Producto A
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          description: La transacción de checkout no pudo completarse.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: Checkout failed
+
+  /api/orders/{orderId}/cancel:
+    post:
+      tags:
+        - Orders
+      summary: Cancelar una orden
+      description: |
+        Cancela una orden perteneciente al usuario, restaura el inventario y marca
+        la orden como `cancelled`. La operación es idempotente cuando la orden ya
+        se encontraba cancelada.
+      operationId: cancelOrder
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      responses:
+        "200":
+          description: Orden cancelada o previamente cancelada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: La orden no existe o no pertenece al usuario autenticado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: Order not found
+        "500":
+          description: La cancelación no pudo completarse.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: Cancel failed
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT obtenido mediante registro o inicio de sesión.
+
+  parameters:
+    ProductId:
+      name: id
+      in: path
+      required: true
+      description: Identificador del producto.
+      schema:
+        type: integer
+        format: int32
+      example: 1
+    ProductIdForCart:
+      name: productId
+      in: path
+      required: true
+      description: Identificador del producto que se eliminará del carrito.
+      schema:
+        type: integer
+        format: int32
+      example: 1
+    OrderId:
+      name: orderId
+      in: path
+      required: true
+      description: Identificador de la orden del usuario autenticado.
+      schema:
+        type: integer
+        format: int32
+      example: 12
+
+  responses:
+    Unauthorized:
+      description: Falta el token o el JWT es inválido, expiró o pertenece a un usuario inexistente.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          examples:
+            missingToken:
+              summary: No se envió Authorization
+              value:
+                error: Missing token
+            invalidToken:
+              summary: Token inválido
+              value:
+                error: Invalid token
+
+  schemas:
+    HealthResponse:
+      type: object
+      required:
+        - ok
+      properties:
+        ok:
+          type: boolean
+          enum:
+            - true
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+
+    CredentialsRequest:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+          pattern: "^[a-zA-Z0-9_.-]{3,64}$"
+          minLength: 3
+          maxLength: 64
+          example: demo
+        password:
+          type: string
+          format: password
+          minLength: 12
+          maxLength: 128
+          writeOnly: true
+          example: demo-password
+
+    PublicUser:
+      type: object
+      required:
+        - id
+        - username
+      properties:
+        id:
+          type: integer
+          format: int32
+          example: 1
+        username:
+          type: string
+          example: demo
+
+    AuthResponse:
+      type: object
+      required:
+        - token
+        - user
+      properties:
+        token:
+          type: string
+          description: JWT con una vigencia de siete días.
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.example.signature
+        user:
+          $ref: "#/components/schemas/PublicUser"
+
+    Product:
+      type: object
+      required:
+        - id
+        - title
+        - description
+        - price
+        - stock
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: integer
+          format: int32
+          example: 1
+        title:
+          type: string
+          example: Producto A
+        description:
+          type: string
+          nullable: true
+          example: null
+        price:
+          type: number
+          format: float
+          description: Importe almacenado actualmente como FLOAT.
+          example: 9.99
+        stock:
+          type: integer
+          format: int32
+          example: 10
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+          example: "2026-07-31T18:00:00.000Z"
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+          example: "2026-07-31T18:00:00.000Z"
+
+    CartAddRequest:
+      type: object
+      required:
+        - productId
+      properties:
+        productId:
+          type: integer
+          format: int32
+          example: 1
+        qty:
+          type: integer
+          default: 1
+          description: La implementación actual aún no exige que la cantidad sea un entero positivo.
+          example: 1
+
+    CartUpdateRequest:
+      type: object
+      required:
+        - productId
+        - qty
+      properties:
+        productId:
+          type: integer
+          format: int32
+          example: 1
+        qty:
+          type: integer
+          description: Reemplaza la cantidad; la implementación actual aún no exige un valor positivo.
+          example: 2
+
+    CartItemSummary:
+      type: object
+      required:
+        - productId
+        - qty
+      properties:
+        productId:
+          type: integer
+          format: int32
+          example: 1
+        qty:
+          type: integer
+          example: 2
+
+    CartItemDetailed:
+      allOf:
+        - $ref: "#/components/schemas/CartItemSummary"
+        - type: object
+          required:
+            - product
+          properties:
+            product:
+              $ref: "#/components/schemas/Product"
+
+    SuccessResponse:
+      type: object
+      required:
+        - ok
+      properties:
+        ok:
+          type: boolean
+          enum:
+            - true
+
+    CheckoutResponse:
+      type: object
+      required:
+        - ok
+        - orderId
+      properties:
+        ok:
+          type: boolean
+          enum:
+            - true
+        orderId:
+          type: integer
+          format: int32
+          example: 12

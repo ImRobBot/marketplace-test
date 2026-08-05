@@ -1,0 +1,22 @@
+/* Base estructural: conserva el orden original de styles.css. */
+@import './legacy/foundation.css';
+@import './legacy/header.css';
+@import './legacy/controls.css';
+@import './legacy/home-hero.css';
+@import './legacy/catalog-product-visual.css';
+@import './legacy/product-states.css';
+@import './legacy/cart.css';
+@import './legacy/auth.css';
+@import './legacy/footer-utilities.css';
+@import './legacy/responsive.css';
+
+/* Tema visual: se carga después de toda la base, igual que antes del refactor. */
+@import './theme/foundation.css';
+@import './theme/header.css';
+@import './theme/controls.css';
+@import './theme/home-catalog.css';
+@import './theme/product.css';
+@import './theme/cart.css';
+@import './theme/auth.css';
+@import './theme/states-footer.css';
+@import './theme/responsive.css';

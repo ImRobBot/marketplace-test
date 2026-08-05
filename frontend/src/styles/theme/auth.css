@@ -1,0 +1,60 @@
+/* Authentication */
+
+.auth-page {
+  width: min(900px, calc(100% - 40px));
+  min-height: auto;
+  grid-template-columns: minmax(340px, 460px) minmax(300px, 1fr);
+  align-items: stretch;
+  gap: 0;
+  padding-block: 40px 70px;
+}
+
+.auth-card {
+  padding: clamp(28px, 5vw, 48px);
+  background: #fff;
+  border: 1px solid #cbd1d3;
+  border-radius: 10px 0 0 10px;
+  box-shadow: 0 3px 12px rgba(15, 32, 44, 0.1);
+}
+
+.auth-card h1 {
+  font-size: clamp(2rem, 4vw, 3rem);
+}
+
+.auth-card__lead {
+  font-size: 13px;
+}
+
+.form-field input {
+  min-height: 44px;
+  border-radius: 5px;
+}
+
+.form-field input:focus {
+  border-color: #b77d12;
+  box-shadow: 0 0 0 3px rgba(243, 181, 68, 0.3);
+}
+
+.auth-story,
+.auth-story--warm {
+  min-height: 100%;
+  justify-content: center;
+  padding: clamp(28px, 4vw, 44px);
+  background: linear-gradient(145deg, #243d4e, #142a38);
+  border-radius: 0 10px 10px 0;
+  box-shadow: 0 3px 12px rgba(15, 32, 44, 0.1);
+}
+
+.auth-story__art {
+  width: 86px;
+  height: 86px;
+  margin-bottom: 28px;
+  color: #172b3a;
+  background: var(--accent);
+  border-color: #ffd27b;
+  border-radius: 12px;
+}
+
+.auth-story h2 {
+  font-size: clamp(1.8rem, 3vw, 2.6rem);
+}

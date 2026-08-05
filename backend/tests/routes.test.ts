@@ -1,0 +1,213 @@
+import type { Express } from 'express';
+import request from 'supertest';
+
+import { createApp, initializeApp } from '../src/app';
+import {
+  CartItem,
+  databaseStorage,
+  Order,
+  OrderItem,
+  Product,
+  sequelize,
+  User
+} from '../src/models';
+
+let app: Express;
+
+beforeAll(async () => {
+  if (databaseStorage !== ':memory:') {
+    throw new Error(`Tests must use an in-memory database, received: ${databaseStorage}`);
+  }
+
+  await initializeApp();
+  app = createApp();
+});
+
+beforeEach(async () => {
+  await CartItem.destroy({ where: {} });
+  await OrderItem.destroy({ where: {} });
+  await Order.destroy({ where: {} });
+  await User.destroy({ where: {} });
+  await Product.update({ stock: 10 }, { where: { title: 'Producto A' } });
+  await Product.update({ stock: 5 }, { where: { title: 'Producto B' } });
+});
+
+afterAll(async () => {
+  await sequelize.close();
+});
+
+async function register(username = 'buyer'): Promise<string> {
+  const response = await request(app)
+    .post('/api/auth/register')
+    .send({ username, password: 'secret123456' })
+    .expect(200);
+
+  return response.body.token as string;
+}
+
+function authenticated(token: string) {
+  const authorization = `Bearer ${token}`;
+  return {
+    get: (path: string) => request(app).get(path).set('Authorization', authorization),
+    post: (path: string) => request(app).post(path).set('Authorization', authorization),
+    put: (path: string) => request(app).put(path).set('Authorization', authorization),
+    delete: (path: string) => request(app).delete(path).set('Authorization', authorization)
+  };
+}
+
+describe('API validation and protected workflows', () => {
+  it('serves health, products and security headers', async () => {
+    const health = await request(app).get('/api/health').expect(200);
+
+    expect(health.body).toEqual({ ok: true });
+    expect(health.headers['x-content-type-options']).toBe('nosniff');
+    expect(health.headers['x-frame-options']).toBe('DENY');
+    expect(health.headers['referrer-policy']).toBe('no-referrer');
+    expect(health.headers['permissions-policy']).toContain('camera=()');
+
+    const products = await request(app).get('/api/products').expect(200);
+    expect(products.body).toHaveLength(2);
+    expect(products.body[0].id).toBe(1);
+
+    await request(app).get('/api/products/1').expect(200);
+    await request(app).get('/api/products/999').expect(404);
+  });
+
+  it('validates credentials and rejects duplicate or invalid logins', async () => {
+    await request(app).post('/api/auth/register').send({}).expect(400);
+    const invalidPassword = await request(app)
+      .post('/api/auth/register')
+      .send({ username: 'ab', password: 'short' })
+      .expect(400);
+    expect(invalidPassword.body).toEqual({
+      error: 'Invalid username'
+    });
+
+    const shortPassword = await request(app)
+      .post('/api/auth/register')
+      .send({ username: 'alice', password: 'short' })
+      .expect(400);
+    expect(shortPassword.body).toEqual({
+      error: 'Password must be between 12 and 128 characters'
+    });
+
+    await request(app)
+      .post('/api/auth/register')
+      .send({ username: 'Alice', password: 'secret123456' })
+      .expect(200);
+    await request(app)
+      .post('/api/auth/register')
+      .send({ username: 'alice', password: 'secret123456' })
+      .expect(400);
+
+    await request(app).post('/api/auth/login').send({}).expect(400);
+    await request(app)
+      .post('/api/auth/login')
+      .send({ username: 'unknown', password: 'secret123456' })
+      .expect(401);
+    await request(app)
+      .post('/api/auth/login')
+      .send({ username: 'ALICE', password: 'wrong-password' })
+      .expect(401);
+    await request(app)
+      .post('/api/auth/login')
+      .send({ username: 'ALICE', password: 'secret123456' })
+      .expect(200);
+
+    const user = await User.findOne({ where: { username: 'alice' } });
+    expect(user?.username).toBe('alice');
+  });
+
+  it('protects cart routes from missing and malformed tokens', async () => {
+    await request(app).get('/api/cart').expect(401).expect({ error: 'Missing token' });
+    await request(app)
+      .get('/api/cart')
+      .set('Authorization', 'Token malformed')
+      .expect(401)
+      .expect({ error: 'Invalid token' });
+    await request(app)
+      .get('/api/cart')
+      .set('Authorization', 'Bearer malformed')
+      .expect(401)
+      .expect({ error: 'Invalid token' });
+
+    const token = await register();
+    const cart = await request(app)
+      .get('/api/cart')
+      .set('Authorization', `bearer ${token}`)
+      .expect(200);
+    expect(cart.body).toEqual([]);
+  });
+
+  it('validates cart additions, updates and removals', async () => {
+    const token = await register();
+
+    await authenticated(token)
+      .post('/api/cart')
+      .send({ productId: 'not-a-number', qty: 1 })
+      .expect(400);
+    await authenticated(token)
+      .post('/api/cart')
+      .send({ productId: 1, qty: 0 })
+      .expect(400);
+    await authenticated(token)
+      .post('/api/cart')
+      .send({ productId: 999, qty: 1 })
+      .expect(404);
+
+    await authenticated(token).post('/api/cart').send({ productId: 1 }).expect(200);
+    const added = await authenticated(token)
+      .post('/api/cart')
+      .send({ productId: 1, qty: 2 })
+      .expect(200);
+    expect(added.body).toEqual([{ productId: 1, qty: 3 }]);
+
+    await authenticated(token)
+      .put('/api/cart')
+      .send({ productId: 2, qty: 1 })
+      .expect(404);
+    await authenticated(token)
+      .put('/api/cart')
+      .send({ productId: 1, qty: 0 })
+      .expect(400);
+    await authenticated(token)
+      .put('/api/cart')
+      .send({ productId: 1, qty: 4 })
+      .expect(200);
+
+    const cart = await authenticated(token).get('/api/cart').expect(200);
+    expect(cart.body[0].qty).toBe(4);
+    await authenticated(token).delete('/api/cart/1').expect(200);
+    expect((await authenticated(token).get('/api/cart').expect(200)).body).toEqual([]);
+  });
+
+  it('rejects empty carts and insufficient stock during checkout', async () => {
+    const token = await register();
+
+    await authenticated(token).post('/api/checkout').expect(400).expect({ error: 'Cart empty' });
+    await authenticated(token).post('/api/cart').send({ productId: 1, qty: 11 }).expect(200);
+    await authenticated(token)
+      .post('/api/checkout')
+      .expect(400)
+      .expect({ error: 'Insufficient stock for Producto A' });
+
+    expect(await CartItem.count()).toBe(1);
+  });
+
+  it('cancels orders idempotently and hides other or missing orders', async () => {
+    const ownerToken = await register('owner');
+    const otherToken = await register('other');
+
+    await authenticated(ownerToken).post('/api/cart').send({ productId: 1, qty: 1 }).expect(200);
+    const checkout = await authenticated(ownerToken).post('/api/checkout').expect(200);
+    const orderId = checkout.body.orderId as number;
+
+    await authenticated(otherToken).post(`/api/orders/${orderId}/cancel`).expect(404);
+    await authenticated(ownerToken).post('/api/orders/999/cancel').expect(404);
+    await authenticated(ownerToken).post(`/api/orders/${orderId}/cancel`).expect(200);
+    await authenticated(ownerToken).post(`/api/orders/${orderId}/cancel`).expect(200);
+
+    const order = await Order.findByPk(orderId);
+    expect(order?.status).toBe('cancelled');
+  });
+});

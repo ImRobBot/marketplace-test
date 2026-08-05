@@ -1,0 +1,243 @@
+.back-link {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 26px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 720;
+}
+
+.back-link:hover {
+  color: var(--brand);
+}
+
+.product-detail {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(360px, 0.95fr);
+  align-items: start;
+  gap: clamp(42px, 7vw, 86px);
+}
+
+.product-detail__visual {
+  overflow: hidden;
+  border-radius: var(--radius-lg) var(--radius-lg) var(--radius-lg) 10px;
+  box-shadow: var(--shadow-md);
+}
+
+.product-detail__visual .product-visual {
+  aspect-ratio: 1 / 0.94;
+}
+
+.product-detail__content {
+  padding-top: 18px;
+}
+
+.product-detail__meta .eyebrow {
+  margin-bottom: 0;
+}
+
+.product-detail h1 {
+  margin: 28px 0 20px;
+  font-size: clamp(3rem, 6vw, 5.4rem);
+  letter-spacing: -0.065em;
+}
+
+.product-detail__description {
+  max-width: 590px;
+  margin-bottom: 28px;
+  color: var(--ink-soft);
+  font-size: 1.08rem;
+  line-height: 1.7;
+}
+
+.product-detail__price {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 28px;
+  padding-block: 24px;
+  border-block: 1px solid var(--line);
+}
+
+.product-detail__price strong {
+  font-size: 2rem;
+  letter-spacing: -0.05em;
+}
+
+.product-detail__price span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.product-detail__purchase {
+  display: grid;
+  grid-template-columns: 106px 1fr;
+  align-items: end;
+  gap: 12px;
+}
+
+.product-detail__purchase > .button:only-child {
+  grid-column: 1 / -1;
+}
+
+.quantity-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 720;
+}
+
+.quantity-field input {
+  width: 100%;
+  min-height: 48px;
+  padding-inline: 14px;
+  background: #fff;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  outline: none;
+}
+
+.product-detail .notice {
+  margin: 18px 0 0;
+}
+
+.product-facts {
+  display: grid;
+  gap: 0;
+  margin: 32px 0 0;
+}
+
+.product-facts > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  padding-block: 13px;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+
+.product-facts dt {
+  color: var(--muted);
+}
+
+.product-facts dd {
+  margin: 0;
+  font-weight: 680;
+  text-align: right;
+}
+
+.empty-state {
+  display: flex;
+  max-width: 700px;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.empty-state--bordered {
+  max-width: none;
+  align-items: center;
+  padding: clamp(48px, 8vw, 92px) 28px;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-md);
+}
+
+.empty-state h1,
+.empty-state h2,
+.empty-state h3 {
+  max-width: 640px;
+  margin-bottom: 12px;
+  font-size: clamp(2rem, 4vw, 3.35rem);
+}
+
+.empty-state p {
+  max-width: 570px;
+  margin-bottom: 24px;
+}
+
+.empty-state__icon {
+  display: grid;
+  width: 54px;
+  height: 54px;
+  place-items: center;
+  margin-bottom: 22px;
+  color: #fff;
+  background: var(--brand);
+  border-radius: 18px 18px 18px 5px;
+  font-size: 18px;
+  font-weight: 780;
+}
+
+.empty-state__icon--bag {
+  position: relative;
+}
+
+.empty-state__icon--bag::before {
+  width: 19px;
+  height: 20px;
+  content: "";
+  border: 2px solid #fff;
+  border-radius: 3px;
+}
+
+.empty-state__icon--bag::after {
+  position: absolute;
+  top: 13px;
+  width: 10px;
+  height: 8px;
+  content: "";
+  border: 2px solid #fff;
+  border-bottom: 0;
+  border-radius: 8px 8px 0 0;
+}
+
+.empty-state__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: #e4e8e3;
+  border-radius: 10px;
+}
+
+.skeleton::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.72), transparent);
+  transform: translateX(-100%);
+  animation: shimmer 1.4s infinite;
+}
+
+.skeleton--visual {
+  aspect-ratio: 1.14 / 1;
+  margin: 10px 10px 0;
+}
+
+.skeleton--line,
+.skeleton--line-short,
+.skeleton--line-medium,
+.skeleton--title {
+  height: 13px;
+  margin-bottom: 14px;
+}
+
+.skeleton--line-short { width: 35%; }
+.skeleton--line-medium { width: 68%; }
+.skeleton--title { width: 78%; height: 58px; }
+
+.skeleton--detail-visual {
+  width: 100%;
+  aspect-ratio: 1 / 0.94;
+  border-radius: var(--radius-lg);
+}
