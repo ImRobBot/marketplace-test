@@ -6,7 +6,7 @@ interface ProductVisualProps {
   compact?: boolean
 }
 
-export default function ProductVisual({ product, compact = false }: ProductVisualProps) {
+export default function ProductVisual({ product, compact = false }: Readonly<ProductVisualProps>) {
   const meta = getProductMeta(product.id)
   const title = product.title || 'Producto'
 

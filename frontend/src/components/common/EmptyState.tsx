@@ -26,7 +26,7 @@ export default function EmptyState({
   bordered = true,
   className = '',
   role
-}: EmptyStateProps) {
+}: Readonly<EmptyStateProps>) {
   const Element: ElementType = as
   const Heading: ElementType = headingAs
   const stateClassName = [

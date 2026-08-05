@@ -23,7 +23,7 @@ export default function ProductGrid({
   onClear,
   onRetry,
   onAdd
-}: ProductGridProps) {
+}: Readonly<ProductGridProps>) {
   if (loading) return <ProductGridSkeleton />
 
   if (error) {

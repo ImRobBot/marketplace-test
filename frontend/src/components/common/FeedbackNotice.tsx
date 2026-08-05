@@ -11,16 +11,22 @@ export default function FeedbackNotice({
   feedback,
   actionLabel,
   actionTo
-}: FeedbackNoticeProps) {
+}: Readonly<FeedbackNoticeProps>) {
   if (!feedback) return null
 
+  if (feedback.type === 'error') {
+    return (
+      <div className="notice notice--error" role="alert">
+        <span>{feedback.message}</span>
+        {actionLabel && actionTo && <Link to={actionTo}>{actionLabel}</Link>}
+      </div>
+    )
+  }
+
   return (
-    <div
-      className={`notice notice--${feedback.type}`}
-      role={feedback.type === 'error' ? 'alert' : 'status'}
-    >
+    <output className="notice notice--success" aria-live="polite">
       <span>{feedback.message}</span>
       {actionLabel && actionTo && <Link to={actionTo}>{actionLabel}</Link>}
-    </div>
+    </output>
   )
 }

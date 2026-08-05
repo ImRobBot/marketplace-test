@@ -23,7 +23,7 @@ export default function AuthLayout({
   story,
   children,
   variant
-}: AuthLayoutProps) {
+}: Readonly<AuthLayoutProps>) {
   return (
     <div className={`page-shell auth-page${variant === 'register' ? ' auth-page--register' : ''}`}>
       <section className="auth-card" aria-labelledby={titleId}>

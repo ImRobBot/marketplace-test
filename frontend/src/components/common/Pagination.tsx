@@ -17,7 +17,7 @@ export default function Pagination({
   totalItems,
   pageSize,
   onPageChange,
-}: PaginationProps) {
+}: Readonly<PaginationProps>) {
   const totalPages = getTotalPages(totalItems, pageSize)
 
   if (totalItems === 0 || totalPages <= 1) {

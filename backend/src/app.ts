@@ -6,11 +6,15 @@ import express, { type Express } from 'express';
 import { models, Product, sequelize, User } from './models';
 import { createAuthRouter } from './routes/auth';
 import { createCartRouter } from './routes/cart';
+import { rateLimit, securityHeaders } from './middleware/security';
 
 export function createApp(): Express {
   const app = express();
-  app.use(cors());
-  app.use(express.json());
+  const allowedOrigin = process.env.CORS_ORIGIN || 'http://localhost:3000';
+  app.use(securityHeaders());
+  app.use(cors({ origin: allowedOrigin }));
+  app.use(express.json({ limit: '10kb' }));
+  app.use(rateLimit());
 
   app.get('/api/health', (_req, res) => {
     res.json({ ok: true });

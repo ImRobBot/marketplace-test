@@ -37,7 +37,7 @@ export default function CatalogSection({
   onRetry,
   onAdd,
   onPageChange
-}: CatalogSectionProps) {
+}: Readonly<CatalogSectionProps>) {
   return (
     <section id="catalogo" className="page-shell catalog-section" aria-labelledby="catalog-title">
       <div className="section-heading">

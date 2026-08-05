@@ -8,6 +8,8 @@ interface CredentialsFormProps {
   passwordPlaceholder: string
   passwordAutoComplete: 'current-password' | 'new-password'
   passwordHint?: string
+  passwordMinLength?: number
+  passwordMaxLength?: number
   submitting: boolean
   hasError: boolean
   submitLabel: string
@@ -25,6 +27,8 @@ export default function CredentialsForm({
   passwordPlaceholder,
   passwordAutoComplete,
   passwordHint,
+  passwordMinLength,
+  passwordMaxLength,
   submitting,
   hasError,
   submitLabel,
@@ -32,7 +36,7 @@ export default function CredentialsForm({
   onUsernameChange,
   onPasswordChange,
   onSubmit
-}: CredentialsFormProps) {
+}: Readonly<CredentialsFormProps>) {
   const usernameId = `${idPrefix}-username`
   const passwordId = `${idPrefix}-password`
   const passwordHintId = `${idPrefix}-password-hint`
@@ -62,6 +66,8 @@ export default function CredentialsForm({
           onChange={event => onPasswordChange(event.target.value)}
           autoComplete={passwordAutoComplete}
           placeholder={passwordPlaceholder}
+          minLength={passwordMinLength}
+          maxLength={passwordMaxLength}
           aria-describedby={passwordHint ? passwordHintId : undefined}
           aria-invalid={hasError}
           required

@@ -6,7 +6,7 @@ interface HeaderSearchProps {
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
 }
 
-export default function HeaderSearch({ query, onQueryChange, onSubmit }: HeaderSearchProps) {
+export default function HeaderSearch({ query, onQueryChange, onSubmit }: Readonly<HeaderSearchProps>) {
   return (
     <form className="header-search" role="search" onSubmit={onSubmit}>
       <label className="sr-only" htmlFor="header-product-search">Buscar productos</label>

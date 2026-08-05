@@ -14,7 +14,7 @@ function BrandContent() {
   )
 }
 
-export default function Brand({ footer = false, linkToHome = false }: BrandProps) {
+export default function Brand({ footer = false, linkToHome = false }: Readonly<BrandProps>) {
   const className = `brand${footer ? ' brand--footer' : ''}`
 
   if (linkToHome) {

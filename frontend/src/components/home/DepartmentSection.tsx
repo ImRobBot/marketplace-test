@@ -12,7 +12,7 @@ export default function DepartmentSection({
   activeQuery,
   onSelect,
   onClear
-}: DepartmentSectionProps) {
+}: Readonly<DepartmentSectionProps>) {
   return (
     <section className="page-shell department-section" aria-labelledby="department-title">
       <div className="department-section__heading">

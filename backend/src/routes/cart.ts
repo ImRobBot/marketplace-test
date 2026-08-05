@@ -12,6 +12,10 @@ interface CartBody {
   qty?: unknown;
 }
 
+function validQuantity(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 1 && value <= 100;
+}
+
 function includedProduct(item: CartItem): Product {
   if (!item.Product) {
     throw new Error('Expected Product association to be loaded');
@@ -41,13 +45,18 @@ export function createCartRouter({ models }: CartRoutesDependencies): Router {
 
   router.post('/cart', auth, async (req, res) => {
     const { productId: rawProductId, qty: rawQty } = req.body as CartBody;
-    const product = await models.Product.findByPk(Number(rawProductId));
+    const productId = Number(rawProductId);
+    const qty = rawQty === undefined ? 1 : rawQty;
+    if (!Number.isSafeInteger(productId) || !validQuantity(qty)) {
+      res.status(400).json({ error: 'Invalid product or quantity' });
+      return;
+    }
+    const product = await models.Product.findByPk(productId);
     if (!product) {
       res.status(404).json({ error: 'Product not found' });
       return;
     }
 
-    const qty = Number(rawQty || 1);
     const [item, created] = await models.CartItem.findOrCreate({
       where: { UserId: req.user!.id, ProductId: product.id },
       defaults: { qty }
@@ -75,7 +84,11 @@ export function createCartRouter({ models }: CartRoutesDependencies): Router {
       return;
     }
 
-    item.qty = Number(qty);
+    if (!validQuantity(qty)) {
+      res.status(400).json({ error: 'Invalid quantity' });
+      return;
+    }
+    item.qty = qty;
     await item.save();
     res.json({ ok: true });
   });

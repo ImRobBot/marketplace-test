@@ -89,6 +89,9 @@
   display: grid;
   grid-template-columns: 36px 38px 36px;
   min-height: 38px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
   overflow: hidden;
   border: 1px solid var(--line-strong);
   border-radius: 999px;

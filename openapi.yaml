@@ -441,12 +441,15 @@ components:
       properties:
         username:
           type: string
-          minLength: 1
+          pattern: "^[a-zA-Z0-9_.-]{3,64}$"
+          minLength: 3
+          maxLength: 64
           example: demo
         password:
           type: string
           format: password
-          minLength: 1
+          minLength: 12
+          maxLength: 128
           writeOnly: true
           example: demo-password
 

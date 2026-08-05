@@ -7,7 +7,7 @@ interface OrderSummaryProps {
   onCheckout: () => void
 }
 
-export default function OrderSummary({ summary, processing, onCheckout }: OrderSummaryProps) {
+export default function OrderSummary({ summary, processing, onCheckout }: Readonly<OrderSummaryProps>) {
   return (
     <aside className="order-summary" aria-labelledby="summary-title">
       <span className="eyebrow">Resumen</span>

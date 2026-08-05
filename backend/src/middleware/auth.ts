@@ -6,7 +6,10 @@ import type { Models } from '../models';
 type AuthModels = Pick<Models, 'User'>;
 
 export function createAuthMiddleware(models: AuthModels): RequestHandler {
-  const jwtSecret = process.env.JWT_SECRET || 'secret';
+  const jwtSecret = process.env.JWT_SECRET;
+  if (!jwtSecret || jwtSecret.length < 32) {
+    throw new Error('JWT_SECRET must be configured with at least 32 characters');
+  }
 
   return async (req, res, next) => {
     const authorization = req.headers.authorization;
@@ -16,7 +19,7 @@ export function createAuthMiddleware(models: AuthModels): RequestHandler {
     }
 
     const parts = authorization.split(' ');
-    if (parts.length !== 2 || !parts[1]) {
+    if (parts.length !== 2 || parts[0].toLowerCase() !== 'bearer' || !parts[1]) {
       res.status(401).json({ error: 'Invalid token' });
       return;
     }

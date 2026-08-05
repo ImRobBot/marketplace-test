@@ -17,7 +17,7 @@ export default function CartItemCard({
   pendingAction,
   onRemove,
   onQuantityChange
-}: CartItemCardProps) {
+}: Readonly<CartItemCardProps>) {
   const product = getCartProduct(item)
   const quantityBusy = pendingAction === `quantity-${item.productId}`
   const removeBusy = pendingAction === `remove-${item.productId}`

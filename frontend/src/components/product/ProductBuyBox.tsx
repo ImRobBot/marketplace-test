@@ -16,6 +16,12 @@ interface ProductBuyBoxProps {
   onAdd: (product: Product) => void
 }
 
+function getAddButtonLabel(adding: boolean, outOfStock: boolean): string {
+  if (adding) return 'Añadiendo…'
+  if (outOfStock) return 'Producto agotado'
+  return 'Añadir al carrito'
+}
+
 export default function ProductBuyBox({
   product,
   productId,
@@ -26,7 +32,7 @@ export default function ProductBuyBox({
   feedback,
   onQuantityChange,
   onAdd
-}: ProductBuyBoxProps) {
+}: Readonly<ProductBuyBoxProps>) {
   return (
     <aside className="product-buy-box" aria-label="Opciones de compra">
       <div className="product-detail__price">
@@ -63,7 +69,7 @@ export default function ProductBuyBox({
               disabled={outOfStock || adding}
               onClick={() => onAdd(product)}
             >
-              {adding ? 'Añadiendo…' : outOfStock ? 'Producto agotado' : 'Añadir al carrito'}
+              {getAddButtonLabel(adding, outOfStock)}
             </button>
           </>
         ) : (

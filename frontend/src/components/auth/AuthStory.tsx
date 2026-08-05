@@ -12,7 +12,7 @@ export default function AuthStory({
   title,
   benefits,
   warm = false
-}: AuthStoryProps) {
+}: Readonly<AuthStoryProps>) {
   return (
     <aside
       className={`auth-story${warm ? ' auth-story--warm' : ''}`}

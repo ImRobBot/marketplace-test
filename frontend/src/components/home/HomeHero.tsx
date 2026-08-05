@@ -6,7 +6,7 @@ interface HomeHeroProps {
   productCount: number
 }
 
-export default function HomeHero({ authenticated, loading, productCount }: HomeHeroProps) {
+export default function HomeHero({ authenticated, loading, productCount }: Readonly<HomeHeroProps>) {
   return (
     <section className="page-shell hero" aria-labelledby="hero-title">
       <div className="hero__copy">

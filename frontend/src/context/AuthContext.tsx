@@ -54,7 +54,7 @@ export function useAuth(): AuthContextValue {
   return context
 }
 
-export function AuthProvider({ children }: AuthProviderProps) {
+export function AuthProvider({ children }: Readonly<AuthProviderProps>) {
   const [user, setUser] = useState<User | null>(loadStoredUser)
   const [token, setToken] = useState<string | null>(() => localStorage.getItem('token'))
 

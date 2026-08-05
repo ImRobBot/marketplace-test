@@ -39,7 +39,7 @@ describe('Marketplace API', () => {
   it('registers and logs in a user', async () => {
     const registerResponse = await request(app)
       .post('/api/auth/register')
-      .send({ username: 'alice', password: 'secret123' })
+      .send({ username: 'alice', password: 'secret123456' })
       .expect(200);
 
     expect(registerResponse.body.user.username).toBe('alice');
@@ -47,7 +47,7 @@ describe('Marketplace API', () => {
 
     const loginResponse = await request(app)
       .post('/api/auth/login')
-      .send({ username: 'alice', password: 'secret123' })
+      .send({ username: 'alice', password: 'secret123456' })
       .expect(200);
 
     expect(loginResponse.body.user.username).toBe('alice');
@@ -56,7 +56,7 @@ describe('Marketplace API', () => {
   it('creates an order from the cart and updates stock', async () => {
     const registerResponse = await request(app)
       .post('/api/auth/register')
-      .send({ username: 'bob', password: 'secret123' })
+      .send({ username: 'bob', password: 'secret123456' })
       .expect(200);
 
     const token = registerResponse.body.token as string;
@@ -81,7 +81,7 @@ describe('Marketplace API', () => {
   it('cancels an order and restores stock', async () => {
     const registerResponse = await request(app)
       .post('/api/auth/register')
-      .send({ username: 'carol', password: 'secret123' })
+      .send({ username: 'carol', password: 'secret123456' })
       .expect(200);
 
     const token = registerResponse.body.token as string;

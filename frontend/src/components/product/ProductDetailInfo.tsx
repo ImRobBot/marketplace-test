@@ -11,7 +11,7 @@ export default function ProductDetailInfo({
   product,
   meta,
   outOfStock
-}: ProductDetailInfoProps) {
+}: Readonly<ProductDetailInfoProps>) {
   return (
     <div className="product-detail__content">
       <span className="eyebrow">{meta.category}</span>

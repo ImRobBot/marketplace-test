@@ -15,7 +15,7 @@ export default function ProductCard({
   authenticated,
   adding,
   onAdd
-}: ProductCardProps) {
+}: Readonly<ProductCardProps>) {
   const meta = getProductMeta(product.id)
   const outOfStock = product.stock <= 0
 

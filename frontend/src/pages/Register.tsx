@@ -5,6 +5,11 @@ import AuthLayout from '../components/auth/AuthLayout'
 import AuthStory from '../components/auth/AuthStory'
 import CredentialsForm from '../components/auth/CredentialsForm'
 import { useAuth } from '../context/AuthContext'
+import {
+  getPasswordValidationError,
+  PASSWORD_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH
+} from '../lib/auth'
 import type { ApiErrorResponse } from '../types'
 
 const registerBenefits = [
@@ -23,14 +28,26 @@ export default function Register() {
 
   const submit = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault()
-    setSubmitting(true)
     setError('')
+    const passwordError = getPasswordValidationError(password)
+    if (passwordError) {
+      setError(passwordError)
+      return
+    }
+
+    setSubmitting(true)
     try {
       await register(username.trim(), password)
       navigate('/')
     } catch (registerError: unknown) {
       const userExists = axios.isAxiosError<ApiErrorResponse>(registerError)
         && registerError.response?.data.error === 'User exists'
+      const passwordPolicy = axios.isAxiosError<ApiErrorResponse>(registerError)
+        && registerError.response?.data.error === 'Password must be between 12 and 128 characters'
+      if (passwordPolicy) {
+        setError('La contraseña debe tener entre 12 y 128 caracteres.')
+        return
+      }
       setError(userExists
         ? 'Ese nombre de usuario ya está en uso. Prueba con otro.'
         : 'No pudimos crear la cuenta. Revisa tus datos e inténtalo de nuevo.')
@@ -65,7 +82,9 @@ export default function Register() {
         usernamePlaceholder="Elige un nombre de usuario"
         passwordPlaceholder="Crea una contraseña"
         passwordAutoComplete="new-password"
-        passwordHint="Usa una contraseña que puedas recordar para esta demostración."
+        passwordHint="Debe tener entre 12 y 128 caracteres."
+        passwordMinLength={PASSWORD_MIN_LENGTH}
+        passwordMaxLength={PASSWORD_MAX_LENGTH}
         submitting={submitting}
         hasError={Boolean(error)}
         submitLabel="Crear cuenta"
