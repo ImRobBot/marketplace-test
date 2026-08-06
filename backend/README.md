@@ -3,18 +3,18 @@
 ## Desarrollo
 
 ```bash
-npm install
-npm run dev
+pnpm install --frozen-lockfile
+pnpm run dev
 ```
 
-`npm run dev` ejecuta `src/index.ts` con recarga automática mediante `tsx`.
+`pnpm run dev` ejecuta `src/index.ts` con recarga automática mediante `tsx`.
 
 ## Catálogo de demostración
 
 Para cargar o sincronizar los 100 productos realistas del catálogo local:
 
 ```bash
-npm run seed:products
+pnpm run seed:products
 ```
 
 El seed es idempotente, conserva los IDs usados por carritos y órdenes y no reinicia el stock de productos existentes. Los productos nuevos reciben su inventario inicial. No elimina registros ni recrea la base.
@@ -22,17 +22,18 @@ El seed es idempotente, conserva los IDs usados por carritos y órdenes y no rei
 ## Compilación y producción
 
 ```bash
-npm run typecheck
-npm run build
-npm start
+pnpm run typecheck
+pnpm run build
+pnpm start
 ```
 
-TypeScript compila las fuentes de `src` en `dist`; `npm start` ejecuta `dist/index.js`.
+TypeScript compila las fuentes de `src` en `dist`; `pnpm start` ejecuta `dist/index.js`.
 
 ## Pruebas
 
 ```bash
-npm test
+pnpm test
+pnpm run test:coverage
 ```
 
 Jest usa una base SQLite en memoria (`DB_STORAGE=:memory:`). Las pruebas no leen ni modifican

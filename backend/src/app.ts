@@ -2,7 +2,9 @@ import 'dotenv/config';
 
 import cors from 'cors';
 import express, { type Express } from 'express';
+import pinoHttp from 'pino-http';
 
+import { logger } from './logger';
 import { models, Product, sequelize, User } from './models';
 import { createAuthRouter } from './routes/auth';
 import { createCartRouter } from './routes/cart';
@@ -14,6 +16,12 @@ export function createApp(): Express {
   app.use(securityHeaders());
   app.use(cors({ origin: allowedOrigin }));
   app.use(express.json({ limit: '10kb' }));
+  app.use(
+    pinoHttp({
+      logger,
+      autoLogging: process.env.NODE_ENV !== 'test'
+    })
+  );
   app.use(rateLimit());
 
   app.get('/api/health', (_req, res) => {
