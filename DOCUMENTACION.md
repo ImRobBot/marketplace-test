@@ -112,7 +112,8 @@ El marcado de cada componente React vive en su archivo `.tsx`; `index.html` solo
 
 ## 5. Requisitos
 
-- Node.js y npm instalados. El entorno usado durante el desarrollo ejecuta Node.js 24.
+- Node.js y pnpm instalados. El entorno usado durante el desarrollo ejecuta Node.js 24.
+- pnpm 9, activado mediante Corepack (`corepack enable`).
 - Dos terminales para trabajar con frontend y backend simultáneamente.
 - Un navegador moderno.
 - Opcional: una herramienta compatible con SQLite para inspeccionar la base de datos.
@@ -127,7 +128,7 @@ Desde la raíz del proyecto:
 
 ```powershell
 cd backend
-npm ci
+pnpm install --frozen-lockfile
 Copy-Item .env.example .env
 ```
 
@@ -143,7 +144,7 @@ Edita `.env` y reemplaza `JWT_SECRET` antes de compartir o desplegar la aplicaci
 
 ```powershell
 cd ..\frontend
-npm ci
+pnpm install --frozen-lockfile
 ```
 
 ## 7. Configuración
@@ -166,13 +167,13 @@ El frontend consume actualmente `http://localhost:4000` desde `AuthContext.tsx`;
 
 ```powershell
 cd backend
-npm run dev
+pnpm run dev
 ```
 
 Para cargar los 100 productos realistas antes de iniciar la API por primera vez:
 
 ```powershell
-npm run seed:products
+pnpm run seed:products
 ```
 
 El comando puede repetirse: conserva IDs y stock de los productos existentes, completa los faltantes y valida que el catálogo administrado contenga exactamente 100 registros.
@@ -181,7 +182,7 @@ El comando puede repetirse: conserva IDs y stock de los productos existentes, co
 
 ```powershell
 cd frontend
-npm run dev
+pnpm run dev
 ```
 
 Direcciones:
@@ -193,7 +194,7 @@ Direcciones:
 | Salud | <http://localhost:4000/api/health> |
 | Catálogo JSON | <http://localhost:4000/api/products> |
 
-En Windows, si la política de PowerShell bloquea `npm.ps1`, usa `npm.cmd run dev`.
+En Windows, si pnpm no está disponible, ejecuta `corepack enable` y vuelve a abrir la terminal.
 
 ## 9. Scripts disponibles
 
@@ -201,22 +202,22 @@ En Windows, si la política de PowerShell bloquea `npm.ps1`, usa `npm.cmd run de
 
 | Comando | Descripción |
 |---|---|
-| `npm run dev` | Ejecuta `src/index.ts` con recarga automática mediante `tsx watch`. |
-| `npm run seed:products` | Sincroniza de forma transaccional los 100 productos del catálogo local. |
-| `npm run typecheck` | Valida TypeScript sin generar archivos. |
-| `npm test` | Ejecuta Jest en serie y usa SQLite en memoria. |
-| `npm run build` | Compila `src` hacia `dist`. |
-| `npm start` | Ejecuta `dist/index.js`. Requiere un build previo. |
+| `pnpm run dev` | Ejecuta `src/index.ts` con recarga automática mediante `tsx watch`. |
+| `pnpm run seed:products` | Sincroniza de forma transaccional los 100 productos del catálogo local. |
+| `pnpm run typecheck` | Valida TypeScript sin generar archivos. |
+| `pnpm test` | Ejecuta Jest en serie y usa SQLite en memoria. |
+| `pnpm run build` | Compila `src` hacia `dist`. |
+| `pnpm start` | Ejecuta `dist/index.js`. Requiere un build previo. |
 
 ### Frontend
 
 | Comando | Descripción |
 |---|---|
-| `npm run dev` | Inicia Vite en el puerto 3000. |
-| `npm run typecheck` | Valida TypeScript sin generar archivos. |
-| `npm test` | Ejecuta Vitest una vez. |
-| `npm run build` | Valida TypeScript y genera `dist`. |
-| `npm run preview` | Sirve localmente el build de Vite. |
+| `pnpm run dev` | Inicia Vite en el puerto 3000. |
+| `pnpm run typecheck` | Valida TypeScript sin generar archivos. |
+| `pnpm test` | Ejecuta Vitest una vez. |
+| `pnpm run build` | Valida TypeScript y genera `dist`. |
+| `pnpm run preview` | Sirve localmente el build de Vite. |
 
 ## 10. Rutas del frontend
 
@@ -360,14 +361,14 @@ Validación recomendada antes de confirmar cambios:
 
 ```powershell
 # Dentro de backend
-npm run typecheck
-npm test
-npm run build
+pnpm run typecheck
+pnpm test
+pnpm run build
 
 # Dentro de frontend
-npm run typecheck
-npm test
-npm run build
+pnpm run typecheck
+pnpm test
+pnpm run build
 ```
 
 ## 15. Build y ejecución compilada
@@ -376,16 +377,16 @@ npm run build
 
 ```powershell
 cd backend
-npm run build
-npm start
+pnpm run build
+pnpm start
 ```
 
 ### Frontend
 
 ```powershell
 cd frontend
-npm run build
-npm run preview
+pnpm run build
+pnpm run preview
 ```
 
 Vite genera el frontend en `frontend/dist`; TypeScript genera el backend en `backend/dist`. Ambos directorios están ignorados por Git.
