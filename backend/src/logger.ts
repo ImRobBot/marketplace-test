@@ -1,9 +1,12 @@
 import pino from 'pino';
 
+const isTest = process.env.NODE_ENV === 'test';
+const isProduction = process.env.NODE_ENV === 'production';
+
 export const logger = pino({
-  level: process.env.LOG_LEVEL || (process.env.NODE_ENV === 'test' ? 'silent' : 'info'),
+  level: process.env.LOG_LEVEL || (isTest ? 'silent' : 'info'),
   transport:
-    process.env.NODE_ENV === 'production'
+    isProduction || isTest
       ? undefined
       : { target: 'pino-pretty', options: { colorize: true, translateTime: 'HH:MM:ss' } }
 });
