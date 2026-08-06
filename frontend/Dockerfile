@@ -8,6 +8,11 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 
 COPY . .
+
+# URL publica del backend, inyectada en tiempo de build (Vite la incrusta en el bundle).
+# Ej: docker build --build-arg VITE_API_URL=https://mi-backend.up.railway.app
+ARG VITE_API_URL
+ENV VITE_API_URL=$VITE_API_URL
 RUN pnpm run build
 
 # --- Etapa runtime: sirve los estaticos con Nginx ---
