@@ -21,7 +21,7 @@ services:
     build:
       context: ./backend
     environment:
-      NODE_ENV: development
+      NODE_ENV: production
       PORT: 4000
       JWT_SECRET: ${JWT_SECRET:-change-this-local-secret-before-sharing}
       CORS_ORIGIN: http://localhost:${FRONTEND_PORT:-3000}
