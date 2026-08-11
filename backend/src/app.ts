@@ -10,6 +10,7 @@ import { asyncHandler, errorHandler, notFoundHandler } from './middleware/errors
 import { databaseDialect, models, Product, sequelize, User } from './models';
 import { createAuthRouter } from './routes/auth';
 import { createCartRouter } from './routes/cart';
+import { createOrderRouter } from './routes/orders';
 import { rateLimit, securityHeaders } from './middleware/security';
 import { parsePositiveInteger } from './validation';
 
@@ -66,6 +67,7 @@ export function createApp(): Express {
   );
   app.use('/api/auth', createAuthRouter({ models: { User } }));
   app.use('/api', createCartRouter({ models }));
+  app.use('/api', createOrderRouter({ models }));
   app.use(notFoundHandler());
   app.use(errorHandler);
 

@@ -7,6 +7,7 @@ import {
   databaseStorage,
   Order,
   OrderItem,
+  Payment,
   Product,
   sequelize,
   User
@@ -25,6 +26,7 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await CartItem.destroy({ where: {} });
+  await Payment.destroy({ where: {} });
   await OrderItem.destroy({ where: {} });
   await Order.destroy({ where: {} });
   await User.destroy({ where: {} });
@@ -273,6 +275,14 @@ describe('API validation and protected workflows', () => {
       .post('/api/orders/not-an-id/cancel')
       .expect(400)
       .expect({ error: 'Invalid order id' });
+    await authenticated(token)
+      .get('/api/orders/not-an-id')
+      .expect(400)
+      .expect({ error: 'Invalid order id' });
+    await authenticated(token)
+      .post('/api/orders/not-an-id/pay')
+      .expect(400)
+      .expect({ error: 'Invalid order id' });
   });
 
   it('returns JSON for unknown routes', async () => {
@@ -295,6 +305,144 @@ describe('API validation and protected workflows', () => {
     expect(await CartItem.count()).toBe(1);
   });
 
+  it('creates a pending order and safely replays an idempotent checkout', async () => {
+    const token = await register('idempotent-checkout');
+    const key = 'checkout-attempt-0001';
+
+    await authenticated(token).post('/api/cart').send({ productId: 1, qty: 2 }).expect(200);
+    const checkout = await authenticated(token)
+      .post('/api/checkout')
+      .set('Idempotency-Key', key)
+      .expect(200);
+
+    expect(checkout.body).toMatchObject({
+      ok: true,
+      replayed: false,
+      order: {
+        id: expect.any(Number),
+        status: 'pending_payment',
+        total: 19.98,
+        payment: { status: 'pending', amountCents: 1998, currency: 'MXN' }
+      }
+    });
+
+    const replay = await authenticated(token)
+      .post('/api/checkout')
+      .set('Idempotency-Key', key)
+      .expect(200);
+    expect(replay.body).toMatchObject({
+      ok: true,
+      replayed: true,
+      order: { id: checkout.body.order.id, status: 'pending_payment' }
+    });
+    expect(await Order.count()).toBe(1);
+    expect(await Payment.count()).toBe(1);
+    expect((await Product.findByPk(1))?.stock).toBe(8);
+
+    await authenticated(token)
+      .post('/api/checkout')
+      .set('Idempotency-Key', 'short')
+      .expect(400)
+      .expect({ error: 'Invalid Idempotency-Key' });
+  });
+
+  it('lists only owned orders and pays a pending order idempotently', async () => {
+    const ownerToken = await register('order-owner');
+    const otherToken = await register('order-outsider');
+
+    await authenticated(ownerToken).post('/api/cart').send({ productId: 2, qty: 1 }).expect(200);
+    const checkout = await authenticated(ownerToken).post('/api/checkout').expect(200);
+    const orderId = checkout.body.order.id as number;
+
+    const orders = await authenticated(ownerToken).get('/api/orders').expect(200);
+    expect(orders.body).toHaveLength(1);
+    expect(orders.body[0]).toMatchObject({ id: orderId, status: 'pending_payment' });
+    await authenticated(otherToken).get('/api/orders').expect(200).expect([]);
+    await authenticated(otherToken).get(`/api/orders/${orderId}`).expect(404);
+    await authenticated(otherToken).post(`/api/orders/${orderId}/pay`).expect(404);
+
+    const detail = await authenticated(ownerToken).get(`/api/orders/${orderId}`).expect(200);
+    expect(detail.body).toMatchObject({
+      id: orderId,
+      status: 'pending_payment',
+      items: [{ ProductId: 2, qty: 1 }],
+      payment: { status: 'pending', amountCents: 1999 }
+    });
+
+    const paid = await authenticated(ownerToken)
+      .post(`/api/orders/${orderId}/pay`)
+      .send({ outcome: 'paid' })
+      .expect(200);
+    expect(paid.body).toMatchObject({
+      ok: true,
+      replayed: false,
+      order: { id: orderId, status: 'paid', payment: { status: 'paid' } }
+    });
+
+    const replay = await authenticated(ownerToken)
+      .post(`/api/orders/${orderId}/pay`)
+      .send({ outcome: 'paid' })
+      .expect(200);
+    expect(replay.body).toMatchObject({
+      ok: true,
+      replayed: true,
+      order: { id: orderId, status: 'paid', payment: { status: 'paid' } }
+    });
+    expect(await Payment.count({ where: { OrderId: orderId } })).toBe(1);
+  });
+
+  it('records a simulated payment failure without allowing outcome changes on replay', async () => {
+    const token = await register('failed-payment');
+    await authenticated(token).post('/api/cart').send({ productId: 1, qty: 1 }).expect(200);
+    const checkout = await authenticated(token).post('/api/checkout').expect(200);
+    const orderId = checkout.body.order.id as number;
+
+    await authenticated(token)
+      .post(`/api/orders/${orderId}/pay`)
+      .send({ outcome: 'declined' })
+      .expect(400)
+      .expect({ error: 'Invalid payment outcome' });
+    const failed = await authenticated(token)
+      .post(`/api/orders/${orderId}/pay`)
+      .send({ outcome: 'failed' })
+      .expect(200);
+    expect(failed.body).toMatchObject({
+      replayed: false,
+      order: { status: 'payment_failed', payment: { status: 'failed' } }
+    });
+
+    const replay = await authenticated(token)
+      .post(`/api/orders/${orderId}/pay`)
+      .send({ outcome: 'paid' })
+      .expect(200);
+    expect(replay.body).toMatchObject({
+      replayed: true,
+      order: { status: 'payment_failed', payment: { status: 'failed' } }
+    });
+  });
+
+  it('keeps simulated payments disabled in production', async () => {
+    const token = await register('production-payment');
+    await authenticated(token).post('/api/cart').send({ productId: 1, qty: 1 }).expect(200);
+    const checkout = await authenticated(token).post('/api/checkout').expect(200);
+    const orderId = checkout.body.order.id as number;
+    const originalEnvironment = process.env.NODE_ENV;
+
+    try {
+      process.env.NODE_ENV = 'production';
+      await authenticated(token)
+        .post(`/api/orders/${orderId}/pay`)
+        .send({ outcome: 'paid' })
+        .expect(503)
+        .expect({ error: 'Simulated payments are disabled' });
+    } finally {
+      process.env.NODE_ENV = originalEnvironment;
+    }
+
+    expect((await Order.findByPk(orderId))?.status).toBe('pending_payment');
+    expect((await Payment.findOne({ where: { OrderId: orderId } }))?.status).toBe('pending');
+  });
+
   it('cancels orders idempotently and hides other or missing orders', async () => {
     const ownerToken = await register('owner');
     const otherToken = await register('other');
@@ -310,6 +458,8 @@ describe('API validation and protected workflows', () => {
 
     const order = await Order.findByPk(orderId);
     expect(order?.status).toBe('cancelled');
+    expect(order?.inventoryReleasedAt).toBeInstanceOf(Date);
+    expect((await Payment.findOne({ where: { OrderId: orderId } }))?.status).toBe('cancelled');
   });
 
   it('restores stock only once when cancellation requests overlap', async () => {

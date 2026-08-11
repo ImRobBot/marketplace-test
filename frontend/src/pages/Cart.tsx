@@ -11,6 +11,17 @@ import { useAuth } from '../context/AuthContext'
 import { calculateCartSummary } from '../lib/cart'
 import type { ApiErrorResponse, CartItem, Feedback } from '../types'
 
+interface CheckoutResponse {
+  order: { id: number; status: string }
+}
+
+function createCheckoutKey(): string {
+  if (typeof globalThis.crypto?.randomUUID === 'function') {
+    return globalThis.crypto.randomUUID()
+  }
+  return `checkout-${Date.now()}-${Math.random().toString(36).slice(2)}`
+}
+
 export default function Cart() {
   const { authAxios, user, authReady } = useAuth()
   const [items, setItems] = useState<CartItem[]>([])
@@ -75,12 +86,29 @@ export default function Cart() {
     setPendingAction('checkout')
     setFeedback(null)
     try {
-      await authAxios.post('/api/checkout')
+      const checkoutResponse = await authAxios.post<CheckoutResponse>(
+        '/api/checkout',
+        undefined,
+        { headers: { 'Idempotency-Key': createCheckoutKey() } }
+      )
+      const orderId = checkoutResponse.data.order?.id
+      if (!Number.isSafeInteger(orderId) || orderId <= 0) {
+        throw new Error('Invalid checkout response')
+      }
+      setItems([])
+
+      try {
+        await authAxios.post(`/api/orders/${orderId}/pay`, { outcome: 'paid' })
       setFeedback({
         type: 'success',
         message: '¡Compra simulada completada! Tu carrito quedó listo para empezar de nuevo.'
-      })
-      setItems([])
+        })
+      } catch {
+        setFeedback({
+          type: 'error',
+          message: 'Tu pedido fue creado, pero el pago quedó pendiente. Revisa tus pedidos antes de reintentar.'
+        })
+      }
     } catch (checkoutError: unknown) {
       const insufficientStock = axios.isAxiosError<ApiErrorResponse>(checkoutError)
         && checkoutError.response?.data.error?.includes('Insufficient stock')
