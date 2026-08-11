@@ -90,6 +90,14 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
               example:
                 error: Not found
+        "400":
+          description: El identificador no es un entero positivo.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: Invalid product id
 
   /api/auth/register:
     post:
@@ -129,6 +137,8 @@ paths:
                   summary: Usuario duplicado
                   value:
                     error: User exists
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
 
   /api/auth/login:
     post:
@@ -161,6 +171,8 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
               example:
                 error: Invalid credentials
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
 
   /api/cart:
     get:
@@ -217,6 +229,12 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
               example:
                 error: Product not found
+        "400":
+          description: El producto o la cantidad no son válidos.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
     put:
       tags:
         - Cart
@@ -250,6 +268,12 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
               example:
                 error: Item not in cart
+        "400":
+          description: El producto o la cantidad no son válidos.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   /api/cart/{productId}:
     delete:
@@ -271,6 +295,12 @@ paths:
                 $ref: "#/components/schemas/SuccessResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "400":
+          description: El identificador del producto no es válido.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   /api/checkout:
     post:
@@ -343,6 +373,12 @@ paths:
                 $ref: "#/components/schemas/SuccessResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "400":
+          description: El identificador de la orden no es válido.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "404":
           description: La orden no existe o no pertenece al usuario autenticado.
           content:
@@ -413,6 +449,14 @@ components:
               summary: Token inválido
               value:
                 error: Invalid token
+    TooManyRequests:
+      description: Se superó el límite temporal de solicitudes.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error: Too many requests
 
   schemas:
     HealthResponse:
@@ -534,7 +578,9 @@ components:
         qty:
           type: integer
           default: 1
-          description: La implementación actual aún no exige que la cantidad sea un entero positivo.
+          minimum: 1
+          maximum: 100
+          description: Cantidad entera positiva; la cantidad acumulada de la línea no puede superar 100.
           example: 1
 
     CartUpdateRequest:
@@ -549,7 +595,9 @@ components:
           example: 1
         qty:
           type: integer
-          description: Reemplaza la cantidad; la implementación actual aún no exige un valor positivo.
+          minimum: 1
+          maximum: 100
+          description: Reemplaza la cantidad de la línea y debe estar entre 1 y 100.
           example: 2
 
     CartItemSummary:

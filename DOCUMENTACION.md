@@ -154,12 +154,13 @@ pnpm install --frozen-lockfile
 | Variable | Valor predeterminado | Uso |
 |---|---:|---|
 | `PORT` | `4000` | Puerto HTTP de Express. |
-| `JWT_SECRET` | Fallback interno `secret` | Firma y validación de JWT. Debe configurarse con un valor robusto fuera de una demo. |
+| `JWT_SECRET` | Sin valor predeterminado | Firma y validación de JWT. Debe configurarse con al menos 32 caracteres; la API rechaza una configuración ausente o débil. |
+| `CORS_ORIGIN` | `http://localhost:3000` | Origen permitido por CORS. La comparación se hace contra el origen configurado. |
 | `DB_STORAGE` | `data/database.sqlite` | Ruta del archivo SQLite. Acepta `:memory:` para una base efímera. |
 
 Archivo de ejemplo: [`backend/.env.example`](./backend/.env.example).
 
-El frontend consume actualmente `http://localhost:4000` desde `AuthContext.tsx`; todavía no existe una variable `VITE_API_URL`.
+El frontend consume `VITE_API_URL` desde `AuthContext.tsx`; si no se define, usa `http://localhost:4000` en desarrollo.
 
 ## 8. Ejecución local
 
@@ -396,14 +397,15 @@ Vite genera el frontend en `frontend/dist`; TypeScript genera el backend en `bac
 Antes de utilizar el proyecto con usuarios o dinero reales se debe considerar lo siguiente:
 
 - El checkout es simulado y crea órdenes directamente como `paid`.
-- `JWT_SECRET` tiene un fallback inseguro para facilitar la demo.
+- `JWT_SECRET` debe gestionarse fuera del repositorio y rotarse con una estrategia operativa.
 - El frontend guarda el JWT en `localStorage`, lo que exige una estrategia estricta contra XSS.
-- CORS está habilitado sin restringir orígenes.
-- Las cantidades no se validan rigurosamente como enteros positivos en todas las rutas.
+- CORS permite el origen configurado en `CORS_ORIGIN`; para despliegues reales debe establecerse explícitamente.
+- Las cantidades del carrito se validan como enteros positivos y cada línea está limitada a 100 unidades.
 - Los precios y totales usan números de punto flotante; producción debería usar enteros en centavos o un tipo decimal.
 - SQLite y `sequelize.sync()` son apropiados para la demo, pero no sustituyen migraciones y una base preparada para concurrencia.
-- No hay limitación de intentos, recuperación de contraseña, verificación de correo ni rotación de tokens.
-- No existe un manejador JSON global para rutas desconocidas y errores asíncronos.
+- La API limita las solicitudes generales y aplica un límite más estricto a autenticación; producción debería usar un almacén distribuido para rate limiting.
+- No existe recuperación de contraseña, verificación de correo ni rotación de tokens.
+- La cancelación serializa solicitudes concurrentes por orden dentro del proceso y usa transacciones; varios procesos requieren una estrategia de coordinación en la base de datos.
 
 Para pagos reales se requiere una pasarela tokenizada, órdenes con estados intermedios, idempotencia, webhooks firmados, reservas de inventario y reembolsos.
 
