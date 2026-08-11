@@ -9,17 +9,11 @@ import EmptyState from '../components/common/EmptyState'
 import FeedbackNotice from '../components/common/FeedbackNotice'
 import { useAuth } from '../context/AuthContext'
 import { calculateCartSummary } from '../lib/cart'
+import { createIdempotencyKey } from '../lib/idempotency'
 import type { ApiErrorResponse, CartItem, Feedback } from '../types'
 
 interface CheckoutResponse {
   order: { id: number; status: string }
-}
-
-function createCheckoutKey(): string {
-  if (typeof globalThis.crypto?.randomUUID === 'function') {
-    return globalThis.crypto.randomUUID()
-  }
-  return `checkout-${Date.now()}-${Math.random().toString(36).slice(2)}`
 }
 
 export default function Cart() {
@@ -89,7 +83,7 @@ export default function Cart() {
       const checkoutResponse = await authAxios.post<CheckoutResponse>(
         '/api/checkout',
         undefined,
-        { headers: { 'Idempotency-Key': createCheckoutKey() } }
+        { headers: { 'Idempotency-Key': createIdempotencyKey() } }
       )
       const orderId = checkoutResponse.data.order?.id
       if (!Number.isSafeInteger(orderId) || orderId <= 0) {

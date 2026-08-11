@@ -1,5 +1,6 @@
 export const PASSWORD_MIN_LENGTH = 12
 export const PASSWORD_MAX_LENGTH = 128
+const REDIRECT_BASE_URL = 'https://marketplace.invalid'
 
 export function getPasswordValidationError(password: string): string {
   if (password.length < PASSWORD_MIN_LENGTH || password.length > PASSWORD_MAX_LENGTH) {
@@ -18,8 +19,8 @@ export function getRedirectTarget(state: unknown): string {
   }
 
   try {
-    const target = new URL(from, 'http://marketplace.local')
-    return target.origin === 'http://marketplace.local' ? from : '/'
+    const target = new URL(from, REDIRECT_BASE_URL)
+    return target.origin === REDIRECT_BASE_URL ? from : '/'
   } catch {
     return '/'
   }
