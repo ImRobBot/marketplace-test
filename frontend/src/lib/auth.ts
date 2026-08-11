@@ -18,10 +18,6 @@ export function getRedirectTarget(state: unknown): string {
     return '/'
   }
 
-  try {
-    const target = new URL(from, REDIRECT_BASE_URL)
-    return target.origin === REDIRECT_BASE_URL ? from : '/'
-  } catch {
-    return '/'
-  }
+  const target = new URL(from, REDIRECT_BASE_URL)
+  return target.origin === REDIRECT_BASE_URL ? from : '/'
 }

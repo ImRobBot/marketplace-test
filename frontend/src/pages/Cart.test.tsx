@@ -151,4 +151,16 @@ describe('Cart page', () => {
     fireEvent.click(screen.getByRole('button', { name: /pagar ahora/i }))
     expect(await screen.findByRole('alert')).toHaveTextContent(/pedido.*pago.*pendiente/i)
   })
+
+  it('rejects a malformed checkout response without attempting payment', async () => {
+    authGet.mockReset().mockResolvedValueOnce({ data: [item] })
+    authPost.mockResolvedValueOnce({ data: { order: { id: 0, status: 'pending_payment' } } })
+
+    renderCart()
+    await screen.findByRole('heading', { name: item.product!.title })
+    fireEvent.click(screen.getByRole('button', { name: /pagar ahora/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/no pudimos completar/i)
+    expect(authPost).toHaveBeenCalledTimes(1)
+  })
 })

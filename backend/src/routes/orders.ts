@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, type Response } from 'express';
 import { UniqueConstraintError, type Transaction } from 'sequelize';
 
 import { createAuthMiddleware } from '../middleware/auth';
@@ -127,6 +127,108 @@ async function findIdempotentOrder(
   });
 }
 
+type CheckoutFailure = 'cart-empty' | 'insufficient-stock';
+
+class CheckoutError extends Error {
+  constructor(readonly reason: CheckoutFailure, message: string) {
+    super(message);
+    this.name = 'CheckoutError';
+  }
+}
+
+function sendCheckoutResponse(res: Response, order: Order, replayed: boolean): void {
+  res.json({
+    ok: true,
+    orderId: order.id,
+    replayed,
+    order: serializeOrder(order)
+  });
+}
+
+async function replayCheckout(
+  models: Models,
+  userId: number,
+  idempotencyKey: string | undefined,
+  res: Response
+): Promise<boolean> {
+  if (!idempotencyKey) return false;
+
+  const existing = await findIdempotentOrder(models, userId, idempotencyKey);
+  if (!existing) return false;
+
+  sendCheckoutResponse(res, existing, true);
+  return true;
+}
+
+async function reserveInventory(items: CartItem[], transaction: Transaction): Promise<number> {
+  let totalCents = 0;
+  for (const item of items) {
+    const product = includedProduct(item);
+    if (product.stock < item.qty) {
+      throw new CheckoutError('insufficient-stock', `Insufficient stock for ${product.title}`);
+    }
+
+    totalCents += Math.round(Number(product.price) * 100) * item.qty;
+    product.stock -= item.qty;
+    await product.save({ transaction });
+  }
+  return totalCents;
+}
+
+async function createCheckoutOrder(
+  models: Models,
+  userId: number,
+  idempotencyKey: string | undefined
+): Promise<Order> {
+  const transaction = await models.sequelize.transaction();
+  try {
+    const items = await models.CartItem.findAll({
+      where: { UserId: userId },
+      include: [{ model: models.Product, required: true }],
+      transaction,
+      lock: transaction.LOCK.UPDATE
+    });
+    if (items.length === 0) throw new CheckoutError('cart-empty', 'Cart empty');
+
+    const totalCents = await reserveInventory(items, transaction);
+    const order = await models.Order.create(
+      {
+        UserId: userId,
+        total: totalCents / 100,
+        status: 'pending_payment',
+        idempotencyKey: idempotencyKey ?? null
+      },
+      { transaction }
+    );
+
+    await models.OrderItem.bulkCreate(
+      items.map(item => {
+        const product = includedProduct(item);
+        return {
+          OrderId: order.id,
+          ProductId: product.id,
+          qty: item.qty,
+          price: product.price
+        };
+      }),
+      { transaction }
+    );
+    await models.Payment.create(
+      { OrderId: order.id, amountCents: totalCents, status: 'pending' },
+      { transaction }
+    );
+    await models.CartItem.destroy({ where: { UserId: userId }, transaction });
+    await transaction.commit();
+
+    const created = await findOwnedOrder(models, userId, order.id);
+    if (!created) throw new Error('Created order not found');
+    return created;
+  } catch (error) {
+    await rollbackIfActive(transaction);
+    throw error;
+  }
+}
+
 function simulatedPaymentsEnabled(): boolean {
   return process.env.NODE_ENV !== 'production'
     && process.env.ENABLE_SIMULATED_PAYMENTS !== 'false';
@@ -143,114 +245,20 @@ export function createOrderRouter({ models }: OrderRoutesDependencies): Router {
       return;
     }
 
-    if (idempotencyKey) {
-      const existing = await findIdempotentOrder(models, req.user!.id, idempotencyKey);
-      if (existing) {
-        res.json({
-          ok: true,
-          orderId: existing.id,
-          replayed: true,
-          order: serializeOrder(existing)
-        });
-        return;
-      }
-    }
+    const userId = req.user!.id;
+    if (await replayCheckout(models, userId, idempotencyKey, res)) return;
 
-    const transaction = await models.sequelize.transaction();
     try {
-      const items = await models.CartItem.findAll({
-        where: { UserId: req.user!.id },
-        include: [{ model: models.Product, required: true }],
-        transaction,
-        lock: transaction.LOCK.UPDATE
-      });
-
-      if (items.length === 0) {
-        await transaction.rollback();
-        if (idempotencyKey) {
-          const existing = await findIdempotentOrder(models, req.user!.id, idempotencyKey);
-          if (existing) {
-            res.json({
-              ok: true,
-              orderId: existing.id,
-              replayed: true,
-              order: serializeOrder(existing)
-            });
-            return;
-          }
-        }
-        res.status(400).json({ error: 'Cart empty' });
+      sendCheckoutResponse(res, await createCheckoutOrder(models, userId, idempotencyKey), false);
+    } catch (error) {
+      if (error instanceof CheckoutError) {
+        if (error.reason === 'cart-empty'
+          && await replayCheckout(models, userId, idempotencyKey, res)) return;
+        res.status(400).json({ error: error.message });
         return;
       }
-
-      let totalCents = 0;
-      for (const item of items) {
-        const product = includedProduct(item);
-        if (product.stock < item.qty) {
-          await transaction.rollback();
-          res.status(400).json({ error: `Insufficient stock for ${product.title}` });
-          return;
-        }
-
-        totalCents += Math.round(Number(product.price) * 100) * item.qty;
-        product.stock -= item.qty;
-        await product.save({ transaction });
-      }
-
-      const order = await models.Order.create(
-        {
-          UserId: req.user!.id,
-          total: totalCents / 100,
-          status: 'pending_payment',
-          idempotencyKey: idempotencyKey ?? null
-        },
-        { transaction }
-      );
-
-      await models.OrderItem.bulkCreate(
-        items.map(item => {
-          const product = includedProduct(item);
-          return {
-            OrderId: order.id,
-            ProductId: product.id,
-            qty: item.qty,
-            price: product.price
-          };
-        }),
-        { transaction }
-      );
-      await models.Payment.create(
-        { OrderId: order.id, amountCents: totalCents, status: 'pending' },
-        { transaction }
-      );
-      await models.CartItem.destroy({
-        where: { UserId: req.user!.id },
-        transaction
-      });
-      await transaction.commit();
-
-      const created = await findOwnedOrder(models, req.user!.id, order.id);
-      if (!created) throw new Error('Created order not found');
-      res.json({
-        ok: true,
-        orderId: created.id,
-        replayed: false,
-        order: serializeOrder(created)
-      });
-    } catch (error) {
-      await rollbackIfActive(transaction);
-      if (error instanceof UniqueConstraintError && idempotencyKey) {
-        const existing = await findIdempotentOrder(models, req.user!.id, idempotencyKey);
-        if (existing) {
-          res.json({
-            ok: true,
-            orderId: existing.id,
-            replayed: true,
-            order: serializeOrder(existing)
-          });
-          return;
-        }
-      }
+      if (error instanceof UniqueConstraintError
+        && await replayCheckout(models, userId, idempotencyKey, res)) return;
       throw error;
     }
   }));

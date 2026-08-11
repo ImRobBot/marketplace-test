@@ -6,7 +6,7 @@ export function createIdempotencyKey(
   }
 
   if (typeof cryptoApi?.getRandomValues !== 'function') {
-    throw new Error('Secure random generation is unavailable')
+    throw new TypeError('Secure random generation is unavailable')
   }
 
   const bytes = cryptoApi.getRandomValues(new Uint8Array(16))

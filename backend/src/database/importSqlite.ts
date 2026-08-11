@@ -27,8 +27,8 @@ function sourcePath(): string {
 }
 
 async function readLegacyRows(source: Sequelize): Promise<Record<string, LegacyRow[]>> {
-  const availableTables = (await source.getQueryInterface().showAllTables()).map(String);
-  const missing = legacyTables.filter(table => !availableTables.includes(table));
+  const availableTables = new Set((await source.getQueryInterface().showAllTables()).map(String));
+  const missing = legacyTables.filter(table => !availableTables.has(table));
   if (missing.length > 0) {
     throw new Error(`SQLite source is missing tables: ${missing.join(', ')}`);
   }

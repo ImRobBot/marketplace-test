@@ -41,6 +41,7 @@ describe('domain utilities', () => {
   })
 
   it('fails closed when secure randomness is unavailable', () => {
+    expect(() => createIdempotencyKey(null)).toThrow(TypeError)
     expect(() => createIdempotencyKey(null)).toThrow(
       'Secure random generation is unavailable'
     )

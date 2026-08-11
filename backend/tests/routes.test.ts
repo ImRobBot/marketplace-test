@@ -279,10 +279,12 @@ describe('API validation and protected workflows', () => {
       .get('/api/orders/not-an-id')
       .expect(400)
       .expect({ error: 'Invalid order id' });
-    await authenticated(token)
+    const invalidPayment = await authenticated(token)
       .post('/api/orders/not-an-id/pay')
       .expect(400)
       .expect({ error: 'Invalid order id' });
+
+    expect(invalidPayment.body).toEqual({ error: 'Invalid order id' });
   });
 
   it('returns JSON for unknown routes', async () => {

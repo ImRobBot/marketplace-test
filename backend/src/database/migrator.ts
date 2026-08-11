@@ -8,7 +8,7 @@ interface AppliedMigration {
 
 async function ensureMetadataTable(sequelize: Sequelize): Promise<void> {
   const queryInterface = sequelize.getQueryInterface();
-  const tableNames = (await queryInterface.showAllTables()).map(table => String(table));
+  const tableNames = (await queryInterface.showAllTables()).map(String);
 
   if (!tableNames.includes('SequelizeMeta')) {
     await queryInterface.createTable('SequelizeMeta', {
