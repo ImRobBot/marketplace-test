@@ -12,15 +12,17 @@ import { calculateCartSummary } from '../lib/cart'
 import type { ApiErrorResponse, CartItem, Feedback } from '../types'
 
 export default function Cart() {
-  const { authAxios, token } = useAuth()
+  const { authAxios, user, authReady } = useAuth()
   const [items, setItems] = useState<CartItem[]>([])
-  const [loading, setLoading] = useState(Boolean(token))
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [pendingAction, setPendingAction] = useState('')
   const [feedback, setFeedback] = useState<Feedback | null>(null)
 
   const load = useCallback(async (showLoading = true): Promise<void> => {
-    if (!token) {
+    if (!authReady) return
+
+    if (!user) {
       setItems([])
       setLoading(false)
       return
@@ -36,7 +38,7 @@ export default function Cart() {
     } finally {
       if (showLoading) setLoading(false)
     }
-  }, [authAxios, token])
+  }, [authAxios, authReady, user])
 
   useEffect(() => {
     void load()
@@ -97,10 +99,12 @@ export default function Cart() {
 
   return (
     <div className="page-shell page-section cart-page">
-      <CartHeader authenticated={Boolean(token)} units={summary.units} />
+      <CartHeader authenticated={Boolean(user)} units={summary.units} />
       <FeedbackNotice feedback={feedback} />
 
-      {!token && (
+      {!authReady && <CartLoadingState />}
+
+      {authReady && !user && (
         <EmptyState
           className="cart-auth-state"
           icon="M"
@@ -115,9 +119,9 @@ export default function Cart() {
         />
       )}
 
-      {token && loading && <CartLoadingState />}
+      {authReady && user && loading && <CartLoadingState />}
 
-      {token && !loading && error && (
+      {authReady && user && !loading && error && (
         <EmptyState
           role="alert"
           icon="!"
@@ -127,7 +131,7 @@ export default function Cart() {
         />
       )}
 
-      {token && !loading && !error && items.length === 0 && (
+      {authReady && user && !loading && !error && items.length === 0 && (
         <EmptyState
           icon=""
           iconClassName="empty-state__icon--bag"
@@ -137,7 +141,7 @@ export default function Cart() {
         />
       )}
 
-      {token && !loading && !error && items.length > 0 && (
+      {authReady && user && !loading && !error && items.length > 0 && (
         <div className="cart-layout">
           <section className="cart-list" aria-label="Productos en el carrito">
             {items.map(item => (

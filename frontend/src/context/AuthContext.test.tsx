@@ -6,30 +6,26 @@ import { AuthProvider, useAuth } from './AuthContext'
 
 vi.mock('axios', () => ({
   default: {
+    get: vi.fn(),
     post: vi.fn(),
-    create: vi.fn(() => ({
-      interceptors: { request: { use: vi.fn() } },
-      get: vi.fn(),
-      post: vi.fn(),
-      put: vi.fn(),
-      delete: vi.fn()
-    }))
+    create: vi.fn(() => ({ get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() }))
   }
 }))
 
 const mockedPost = vi.mocked(axios.post)
+const mockedGet = vi.mocked(axios.get)
 const mockedCreate = vi.mocked(axios.create)
 
 function ContextProbe() {
-  const { user, token, login, register, logout } = useAuth()
+  const { user, authReady, login, register, logout } = useAuth()
 
   return (
     <>
       <output data-testid="user">{user?.username ?? 'none'}</output>
-      <output data-testid="token">{token ?? 'none'}</output>
+      <output data-testid="ready">{authReady ? 'ready' : 'loading'}</output>
       <button type="button" onClick={() => void login('alice', 'secret123456')}>Login</button>
       <button type="button" onClick={() => void register('bob', 'secret123456')}>Register</button>
-      <button type="button" onClick={logout}>Logout</button>
+      <button type="button" onClick={() => void logout()}>Logout</button>
     </>
   )
 }
@@ -50,59 +46,64 @@ beforeEach(() => {
 })
 
 describe('AuthContext', () => {
-  it('loads valid persisted credentials and discards malformed users', () => {
-    localStorage.setItem('token', 'persisted-token')
-    localStorage.setItem('user', '{malformed-json')
-
+  it('restores the session from the HttpOnly cookie through /me', async () => {
+    localStorage.setItem('token', 'legacy-token-must-be-ignored')
+    mockedGet.mockResolvedValueOnce({
+      data: { user: { id: 3, username: 'carol' } }
+    } as never)
     renderProvider()
 
-    expect(screen.getByTestId('user')).toHaveTextContent('none')
-    expect(screen.getByTestId('token')).toHaveTextContent('persisted-token')
-
-    cleanup()
-    localStorage.setItem('user', JSON.stringify({ id: 3, username: 'carol' }))
-    renderProvider()
-
-    expect(screen.getByTestId('user')).toHaveTextContent('carol')
+    expect(await screen.findByTestId('user')).toHaveTextContent('carol')
+    expect(screen.getByTestId('ready')).toHaveTextContent('ready')
+    expect(mockedGet).toHaveBeenCalledWith(
+      'http://localhost:4000/api/auth/me',
+      { withCredentials: true }
+    )
+    expect(localStorage.getItem('token')).toBeNull()
   })
 
-  it('persists login and registration responses and supports logout', async () => {
+  it('uses credentialed cookie requests for login, registration and logout', async () => {
+    mockedGet.mockRejectedValueOnce(new Error('no session'))
     mockedPost
       .mockResolvedValueOnce({
-        data: { token: 'login-token', user: { id: 1, username: 'alice' } }
+        data: { user: { id: 1, username: 'alice' } }
       } as never)
       .mockResolvedValueOnce({
-        data: { token: 'register-token', user: { id: 2, username: 'bob' } }
+        data: { user: { id: 2, username: 'bob' } }
       } as never)
+      .mockResolvedValueOnce({ data: { ok: true } } as never)
 
     renderProvider()
 
     fireEvent.click(screen.getByRole('button', { name: 'Login' }))
-    await waitFor(() => expect(screen.getByTestId('token')).toHaveTextContent('login-token'))
-    expect(localStorage.getItem('user')).toContain('alice')
+    await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('alice'))
+    expect(mockedPost).toHaveBeenCalledWith(
+      'http://localhost:4000/api/auth/login',
+      { username: 'alice', password: 'secret123456' },
+      { withCredentials: true }
+    )
 
     fireEvent.click(screen.getByRole('button', { name: 'Register' }))
     await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('bob'))
-    expect(localStorage.getItem('token')).toBe('register-token')
+    expect(localStorage.getItem('token')).toBeNull()
 
     fireEvent.click(screen.getByRole('button', { name: 'Logout' }))
-    await waitFor(() => expect(screen.getByTestId('token')).toHaveTextContent('none'))
-    expect(localStorage.getItem('user')).toBeNull()
+    await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('none'))
+    expect(mockedPost).toHaveBeenLastCalledWith(
+      'http://localhost:4000/api/auth/logout',
+      {},
+      { withCredentials: true }
+    )
   })
 
-  it('adds the bearer token through the axios request interceptor', () => {
-    localStorage.setItem('token', 'interceptor-token')
+  it('creates an API client that always includes browser credentials', () => {
+    mockedGet.mockRejectedValueOnce(new Error('no session'))
     renderProvider()
 
-    const created = mockedCreate.mock.results[0]?.value as {
-      interceptors: { request: { use: { mock: { calls: unknown[][] } } } }
-    }
-    const requestUse = created.interceptors.request.use
-    const interceptor = requestUse.mock.calls[0]?.[0] as (
-      config: { headers: Record<string, string> }
-    ) => { headers: Record<string, string> }
-
-    expect(interceptor({ headers: {} }).headers.Authorization).toBe('Bearer interceptor-token')
+    expect(mockedCreate).toHaveBeenCalledWith({
+      baseURL: 'http://localhost:4000',
+      withCredentials: true
+    })
   })
 
   it('requires AuthProvider when useAuth is called', () => {

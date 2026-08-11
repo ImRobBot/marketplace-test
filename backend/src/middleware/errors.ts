@@ -23,7 +23,18 @@ export function notFoundHandler(): RequestHandler {
 }
 
 export const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
-  logger.error({ err: error }, 'Unhandled request error');
+  const statusCode = typeof error === 'object' && error !== null && 'status' in error
+    && typeof error.status === 'number'
+    ? error.status
+    : 500;
+  const errorName = error instanceof Error ? error.name : 'UnknownError';
+
+  logger.error({ errorName, statusCode }, 'Unhandled request error');
+
+  if (statusCode === 413) {
+    res.status(413).json({ error: 'Payload too large' });
+    return;
+  }
 
   if (error instanceof SyntaxError) {
     res.status(400).json({ error: 'Invalid JSON' });

@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode
 } from 'react'
@@ -14,10 +15,10 @@ export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:40
 
 interface AuthContextValue {
   user: User | null
-  token: string | null
+  authReady: boolean
   login: (username: string, password: string) => Promise<AuthResponse>
   register: (username: string, password: string) => Promise<AuthResponse>
-  logout: () => void
+  logout: () => Promise<void>
   authAxios: AxiosInstance
 }
 
@@ -32,18 +33,6 @@ function isUser(value: unknown): value is User {
   return typeof candidate.id === 'number' && typeof candidate.username === 'string'
 }
 
-function loadStoredUser(): User | null {
-  const storedUser = localStorage.getItem('user')
-  if (!storedUser) return null
-
-  try {
-    const parsedUser: unknown = JSON.parse(storedUser)
-    return isUser(parsedUser) ? parsedUser : null
-  } catch {
-    return null
-  }
-}
-
 export const AuthContext = createContext<AuthContextValue | undefined>(undefined)
 
 export function useAuth(): AuthContextValue {
@@ -55,54 +44,73 @@ export function useAuth(): AuthContextValue {
 }
 
 export function AuthProvider({ children }: Readonly<AuthProviderProps>) {
-  const [user, setUser] = useState<User | null>(loadStoredUser)
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem('token'))
+  const [user, setUser] = useState<User | null>(null)
+  const [authReady, setAuthReady] = useState(false)
+  const sessionGeneration = useRef(0)
 
   useEffect(() => {
-    if (token) localStorage.setItem('token', token)
-    else localStorage.removeItem('token')
+    localStorage.removeItem('token')
+    localStorage.removeItem('user')
+    const generation = ++sessionGeneration.current
 
-    if (user) localStorage.setItem('user', JSON.stringify(user))
-    else localStorage.removeItem('user')
-  }, [token, user])
+    axios.get<{ user: User }>(`${API_BASE_URL}/api/auth/me`, { withCredentials: true })
+      .then(response => {
+        if (generation === sessionGeneration.current && isUser(response.data.user)) {
+          setUser(response.data.user)
+        }
+      })
+      .catch(() => {
+        if (generation === sessionGeneration.current) setUser(null)
+      })
+      .finally(() => {
+        if (generation === sessionGeneration.current) setAuthReady(true)
+      })
+  }, [])
 
   const login = useCallback(async (username: string, password: string): Promise<AuthResponse> => {
-    const response = await axios.post<AuthResponse>(`${API_BASE_URL}/api/auth/login`, {
-      username,
-      password
-    })
-    setToken(response.data.token)
+    const generation = ++sessionGeneration.current
+    const response = await axios.post<AuthResponse>(
+      `${API_BASE_URL}/api/auth/login`,
+      { username, password },
+      { withCredentials: true }
+    )
+    if (generation !== sessionGeneration.current) return response.data
     setUser(response.data.user)
+    setAuthReady(true)
     return response.data
   }, [])
 
   const register = useCallback(async (username: string, password: string): Promise<AuthResponse> => {
-    const response = await axios.post<AuthResponse>(`${API_BASE_URL}/api/auth/register`, {
-      username,
-      password
-    })
-    setToken(response.data.token)
+    const generation = ++sessionGeneration.current
+    const response = await axios.post<AuthResponse>(
+      `${API_BASE_URL}/api/auth/register`,
+      { username, password },
+      { withCredentials: true }
+    )
+    if (generation !== sessionGeneration.current) return response.data
     setUser(response.data.user)
+    setAuthReady(true)
     return response.data
   }, [])
 
-  const logout = useCallback(() => {
-    setToken(null)
-    setUser(null)
+  const logout = useCallback(async (): Promise<void> => {
+    ++sessionGeneration.current
+    try {
+      await axios.post(`${API_BASE_URL}/api/auth/logout`, {}, { withCredentials: true })
+    } finally {
+      setUser(null)
+      setAuthReady(true)
+    }
   }, [])
 
-  const authAxios = useMemo(() => {
-    const instance = axios.create({ baseURL: API_BASE_URL })
-    instance.interceptors.request.use(config => {
-      if (token) config.headers.Authorization = `Bearer ${token}`
-      return config
-    })
-    return instance
-  }, [token])
+  const authAxios = useMemo(
+    () => axios.create({ baseURL: API_BASE_URL, withCredentials: true }),
+    []
+  )
 
   const value = useMemo<AuthContextValue>(
-    () => ({ user, token, login, register, logout, authAxios }),
-    [user, token, login, register, logout, authAxios]
+    () => ({ user, authReady, login, register, logout, authAxios }),
+    [user, authReady, login, register, logout, authAxios]
   )
 
   return (

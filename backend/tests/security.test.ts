@@ -18,6 +18,10 @@ describe('security middleware', () => {
       'Permissions-Policy',
       'camera=(), microphone=(), geolocation=()'
     );
+    expect(setHeader).toHaveBeenCalledWith(
+      'Content-Security-Policy',
+      "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
+    );
     expect(next).toHaveBeenCalledTimes(1);
   });
 

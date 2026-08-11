@@ -13,12 +13,12 @@ vi.mock('axios', () => ({
       data: [{ id: 1, title: 'Producto A', price: 9.99, stock: 10 }]
     }),
     create: vi.fn(() => ({
-      interceptors: { request: { use: vi.fn() } },
       get: vi.fn(),
       post: vi.fn(),
       put: vi.fn(),
       delete: vi.fn()
-    }))
+    })),
+    post: vi.fn()
   }
 }))
 
@@ -45,8 +45,10 @@ describe('application shell', () => {
   })
 
   it('renders the signed-in header and logs the user out', async () => {
-    localStorage.setItem('token', 'token')
-    localStorage.setItem('user', JSON.stringify({ id: 1, username: 'alice' }))
+    vi.mocked(axios.get).mockResolvedValueOnce({
+      data: { user: { id: 1, username: 'alice' } }
+    } as never)
+    vi.mocked(axios.post).mockResolvedValueOnce({ data: { ok: true } } as never)
 
     render(
       <AuthProvider>
@@ -56,7 +58,7 @@ describe('application shell', () => {
       </AuthProvider>
     )
 
-    expect(screen.getByText('Hola, alice')).toBeInTheDocument()
+    expect(await screen.findByText('Hola, alice')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /cerrar sesión/i }))
     await waitFor(() => expect(screen.getByText('Hola, ingresa')).toBeInTheDocument())
   })

@@ -39,6 +39,7 @@ afterAll(async () => {
 async function register(username = 'buyer'): Promise<string> {
   const response = await request(app)
     .post('/api/auth/register')
+    .set('X-Auth-Transport', 'bearer')
     .send({ username, password: 'secret123456' })
     .expect(200);
 
@@ -68,6 +69,8 @@ describe('API validation and protected workflows', () => {
     expect(health.headers['x-frame-options']).toBe('DENY');
     expect(health.headers['referrer-policy']).toBe('no-referrer');
     expect(health.headers['permissions-policy']).toContain('camera=()');
+    expect(health.headers['content-security-policy']).toContain("default-src 'none'");
+    expect(health.headers['x-powered-by']).toBeUndefined();
 
     const products = await request(app).get('/api/products').expect(200);
     expect(products.body).toHaveLength(2);
@@ -193,6 +196,51 @@ describe('API validation and protected workflows', () => {
     expect(cart.body[0].qty).toBe(4);
     await authenticated(token).delete('/api/cart/1').expect(200);
     expect((await authenticated(token).get('/api/cart').expect(200)).body).toEqual([]);
+  });
+
+  it('uses an HttpOnly cookie by default and clears it on logout', async () => {
+    const browser = request.agent(app);
+    const registration = await browser
+      .post('/api/auth/register')
+      .send({ username: 'cookie-user', password: 'secret123456' })
+      .expect(200);
+
+    expect(registration.body).toEqual({ user: { id: expect.any(Number), username: 'cookie-user' } });
+    expect(registration.headers['set-cookie']?.[0]).toContain('mercado_session=');
+    expect(registration.headers['set-cookie']?.[0]).toContain('HttpOnly');
+    expect(registration.headers['set-cookie']?.[0]).toContain('SameSite=Lax');
+
+    await browser.get('/api/auth/me').expect(200).expect({
+      user: { id: registration.body.user.id, username: 'cookie-user' }
+    });
+    await browser.get('/api/cart').expect(200).expect([]);
+    await browser
+      .post('/api/cart')
+      .set('Origin', 'http://evil.example')
+      .send({ productId: 1, qty: 1 })
+      .expect(403)
+      .expect({ error: 'Invalid request origin' });
+    await browser
+      .post('/api/auth/logout')
+      .set('Origin', 'http://localhost:3000')
+      .expect(200)
+      .expect({ ok: true });
+    await browser.get('/api/auth/me').expect(401);
+  });
+
+  it('returns 413 for oversized JSON without exposing the submitted body', async () => {
+    const { logger } = await import('../src/logger');
+    const errorLog = jest.spyOn(logger, 'error');
+    const secretMarker = 'must-not-appear-in-logs';
+
+    await request(app)
+      .post('/api/auth/login')
+      .send({ username: 'oversized', password: secretMarker.repeat(1000) })
+      .expect(413)
+      .expect({ error: 'Payload too large' });
+
+    expect(JSON.stringify(errorLog.mock.calls)).not.toContain(secretMarker);
+    errorLog.mockRestore();
   });
 
   it('rejects cart quantities that exceed the per-line maximum after accumulation', async () => {

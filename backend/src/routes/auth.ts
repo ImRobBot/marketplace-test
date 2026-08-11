@@ -2,6 +2,8 @@ import bcrypt from 'bcryptjs';
 import { Router } from 'express';
 import jwt from 'jsonwebtoken';
 
+import { clearSessionCookie, setSessionCookie } from '../auth/session';
+import { createAuthMiddleware } from '../middleware/auth';
 import { asyncHandler } from '../middleware/errors';
 import type { Models } from '../models';
 import { isRecord } from '../validation';
@@ -17,6 +19,7 @@ interface CredentialsBody {
 
 export function createAuthRouter({ models }: AuthRoutesDependencies): Router {
   const router = Router();
+  const auth = createAuthMiddleware(models);
   const jwtSecret = process.env.JWT_SECRET;
   if (!jwtSecret || jwtSecret.length < 32) {
     throw new Error('JWT_SECRET must be configured with at least 32 characters');
@@ -45,10 +48,15 @@ export function createAuthRouter({ models }: AuthRoutesDependencies): Router {
     const passwordHash = await bcrypt.hash(password, 12);
     const user = await models.User.create({ username: normalizedUsername, passwordHash });
     const token = jwt.sign({ sub: user.id, username: user.username }, jwtSecret, {
+      algorithm: 'HS256',
       expiresIn: '7d'
     });
 
-    res.json({ token, user: { id: user.id, username: user.username } });
+    setSessionCookie(res, token);
+    const publicUser = { id: user.id, username: user.username };
+    const issueBearer = process.env.ALLOW_BEARER_AUTH === 'true'
+      && req.header('X-Auth-Transport')?.toLowerCase() === 'bearer';
+    res.json(issueBearer ? { token, user: publicUser } : { user: publicUser });
   }));
 
   router.post('/login', asyncHandler(async (req, res) => {
@@ -79,11 +87,25 @@ export function createAuthRouter({ models }: AuthRoutesDependencies): Router {
     }
 
     const token = jwt.sign({ sub: user.id, username: user.username }, jwtSecret, {
+      algorithm: 'HS256',
       expiresIn: '7d'
     });
 
-    res.json({ token, user: { id: user.id, username: user.username } });
+    setSessionCookie(res, token);
+    const publicUser = { id: user.id, username: user.username };
+    const issueBearer = process.env.ALLOW_BEARER_AUTH === 'true'
+      && req.header('X-Auth-Transport')?.toLowerCase() === 'bearer';
+    res.json(issueBearer ? { token, user: publicUser } : { user: publicUser });
   }));
+
+  router.get('/me', auth, (req, res) => {
+    res.json({ user: req.user });
+  });
+
+  router.post('/logout', auth, (req, res) => {
+    clearSessionCookie(res);
+    res.json({ ok: true });
+  });
 
   return router;
 }

@@ -39,6 +39,7 @@ describe('Marketplace API', () => {
   it('registers and logs in a user', async () => {
     const registerResponse = await request(app)
       .post('/api/auth/register')
+      .set('X-Auth-Transport', 'bearer')
       .send({ username: 'alice', password: 'secret123456' })
       .expect(200);
 
@@ -47,6 +48,7 @@ describe('Marketplace API', () => {
 
     const loginResponse = await request(app)
       .post('/api/auth/login')
+      .set('X-Auth-Transport', 'bearer')
       .send({ username: 'alice', password: 'secret123456' })
       .expect(200);
 
@@ -56,6 +58,7 @@ describe('Marketplace API', () => {
   it('creates an order from the cart and updates stock', async () => {
     const registerResponse = await request(app)
       .post('/api/auth/register')
+      .set('X-Auth-Transport', 'bearer')
       .send({ username: 'bob', password: 'secret123456' })
       .expect(200);
 
@@ -81,6 +84,7 @@ describe('Marketplace API', () => {
   it('cancels an order and restores stock', async () => {
     const registerResponse = await request(app)
       .post('/api/auth/register')
+      .set('X-Auth-Transport', 'bearer')
       .send({ username: 'carol', password: 'secret123456' })
       .expect(200);
 

@@ -37,7 +37,8 @@ beforeEach(() => {
   vi.clearAllMocks()
   mockedUseAuth.mockReturnValue({
     authAxios,
-    token: 'token'
+    user: { id: 1, username: 'alice' },
+    authReady: true
   } as unknown as ReturnType<typeof useAuth>)
   authGet.mockResolvedValue({ data: [] })
 })
@@ -54,7 +55,8 @@ describe('Cart page', () => {
   it('shows login actions to unauthenticated visitors', () => {
     mockedUseAuth.mockReturnValue({
       authAxios,
-      token: null
+      user: null,
+      authReady: true
     } as unknown as ReturnType<typeof useAuth>)
 
     renderCart()

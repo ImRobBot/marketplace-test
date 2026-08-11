@@ -16,9 +16,9 @@ import { parsePositiveInteger } from './validation';
 export function createApp(): Express {
   const app = express();
   const allowedOrigin = process.env.CORS_ORIGIN || 'http://localhost:3000';
+  app.disable('x-powered-by');
   app.use(securityHeaders());
-  app.use(cors({ origin: allowedOrigin }));
-  app.use(express.json({ limit: '10kb' }));
+  app.use(cors({ origin: allowedOrigin, credentials: true }));
   app.use(
     pinoHttp({
       logger,
@@ -26,6 +26,7 @@ export function createApp(): Express {
     })
   );
   app.use(rateLimit());
+  app.use(express.json({ limit: '10kb', strict: true }));
 
   app.get('/api/health', (_req, res) => {
     res.json({
@@ -56,7 +57,13 @@ export function createApp(): Express {
     res.json(product);
   }));
 
-  app.use('/api/auth', rateLimit({ windowMs: 60_000, maxRequests: 20 }));
+  app.use(
+    '/api/auth',
+    rateLimit({
+      windowMs: 60_000,
+      maxRequests: process.env.NODE_ENV === 'test' ? 1_000 : 20
+    })
+  );
   app.use('/api/auth', createAuthRouter({ models: { User } }));
   app.use('/api', createCartRouter({ models }));
   app.use(notFoundHandler());
