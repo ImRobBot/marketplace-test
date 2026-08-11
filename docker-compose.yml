@@ -1,35 +1,58 @@
 services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-marketplace}
+      POSTGRES_USER: ${POSTGRES_USER:-marketplace}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-marketplace-password}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
   backend:
     build:
       context: ./backend
-    container_name: marketplace-backend
     environment:
+      NODE_ENV: development
       PORT: 4000
-      JWT_SECRET: ${JWT_SECRET:-change-this-to-a-random-32-char-value-in-.env}
-      CORS_ORIGIN: http://localhost:3000
-      DB_STORAGE: /app/data/database.sqlite
-    volumes:
-      - backend_data:/app/data
+      JWT_SECRET: ${JWT_SECRET:-change-this-local-secret-before-sharing}
+      CORS_ORIGIN: http://localhost:${FRONTEND_PORT:-3000}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-marketplace}:${POSTGRES_PASSWORD:-local-marketplace-password}@postgres:5432/${POSTGRES_DB:-marketplace}
+      DATABASE_SSL: "false"
+      ENABLE_SIMULATED_PAYMENTS: "true"
+      TRUST_PROXY: "1"
+    depends_on:
+      postgres:
+        condition: service_healthy
     ports:
-      - "4000:4000"
+      - "127.0.0.1:${BACKEND_PORT:-4000}:4000"
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:4000/api/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
-      interval: 15s
+      interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 10s
+      start_period: 15s
     restart: unless-stopped
 
   frontend:
     build:
       context: ./frontend
-    container_name: marketplace-frontend
+      args:
+        VITE_API_URL: ""
     depends_on:
       backend:
         condition: service_healthy
     ports:
-      - "3000:80"
+      - "127.0.0.1:${FRONTEND_PORT:-3000}:80"
     restart: unless-stopped
 
 volumes:
-  backend_data:
+  postgres_data:

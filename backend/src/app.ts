@@ -17,6 +17,10 @@ import { parsePositiveInteger } from './validation';
 export function createApp(): Express {
   const app = express();
   const allowedOrigin = process.env.CORS_ORIGIN || 'http://localhost:3000';
+  const trustedProxyHops = Number(process.env.TRUST_PROXY);
+  if (Number.isSafeInteger(trustedProxyHops) && trustedProxyHops > 0) {
+    app.set('trust proxy', trustedProxyHops);
+  }
   app.disable('x-powered-by');
   app.use(securityHeaders());
   app.use(cors({ origin: allowedOrigin, credentials: true }));

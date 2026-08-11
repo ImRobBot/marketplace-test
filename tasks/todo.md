@@ -1,10 +1,15 @@
-# Tareas de la rama `feature/marketplace-hardening`
+# Tareas de `feature/marketplace-hardening`
 
-- [x] Línea base: ejecutar tests, typecheck y build con el gestor fijado por el repositorio.
-- [x] Añadir utilidades de validación de cuerpos e IDs.
-- [x] Cubrir y corregir el límite acumulado de cantidades del carrito.
-- [x] Cubrir y corregir cancelación idempotente dentro de transacción.
-- [x] Añadir manejador de 404 y errores JSON.
-- [x] Reforzar bcrypt y límite de autenticación.
-- [x] Actualizar OpenAPI/documentación.
-- [ ] Ejecutar suite completa, builds, auditoría de dependencias y revisión de calidad.
+- [x] Establecer línea base, tests, typecheck, build y auditoría.
+- [x] Validar entradas, IDs, credenciales y cantidades.
+- [x] Configurar PostgreSQL por defecto y SQLite solo para tests/importación.
+- [x] Añadir migraciones versionadas y runner con `SequelizeMeta`.
+- [x] Añadir importación SQLite → PostgreSQL de solo lectura.
+- [x] Separar pedidos y pagos con estados e idempotencia.
+- [x] Añadir listado/detalle aislado, pago simulado y cancelación segura.
+- [x] Migrar la sesión del navegador a cookie HttpOnly.
+- [x] Corregir logs, payloads sobredimensionados, rate limits y headers.
+- [x] Retirar `sqlite3` del runtime y corregir dependencias auditadas.
+- [x] Actualizar Compose, Dockerfiles y CI con PostgreSQL real.
+- [x] Actualizar README, guías, ADR, OpenAPI y Postman.
+- [x] Ejecutar suite completa, builds, auditoría y revisión final.

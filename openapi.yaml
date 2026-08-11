@@ -1,53 +1,51 @@
 openapi: 3.0.3
 info:
   title: Mercado Uno API
-  version: 0.1.0
+  version: 0.2.0
   description: |
-    Contrato de la API REST del marketplace Mercado Uno.
-
-    La API expone catálogo, autenticación JWT, carrito, checkout simulado y
-    cancelación de órdenes. El checkout no procesa pagos reales: crea la orden
-    directamente con estado `paid` después de validar el inventario.
+    API REST del marketplace educativo Mercado Uno. PostgreSQL es la base de
+    producción. El checkout reserva inventario y crea un pedido y un pago
+    pendientes; el proveedor simulado solo está disponible fuera de producción.
   license:
     name: Uso educativo
+security: []
 servers:
+  - url: http://localhost:3000
+    description: Stack Docker, con la API publicada por el proxy del frontend
   - url: http://localhost:4000
-    description: Servidor local de desarrollo
+    description: API directa para desarrollo
 tags:
   - name: Health
-    description: Estado del servicio.
+    description: Disponibilidad y versión del proceso HTTP.
   - name: Products
     description: Consulta pública del catálogo.
   - name: Authentication
-    description: Registro e inicio de sesión.
+    description: Registro, sesión y cierre mediante cookie HttpOnly.
   - name: Cart
-    description: Operaciones protegidas sobre el carrito del usuario.
+    description: Carrito aislado del usuario autenticado.
   - name: Orders
-    description: Checkout simulado y cancelación de órdenes.
+    description: Checkout, consulta, pago simulado y cancelación.
 
 paths:
   /api/health:
     get:
-      tags:
-        - Health
+      tags: [Health]
       summary: Consultar el estado de la API
       operationId: getHealth
       responses:
         "200":
-          description: La API está disponible.
+          description: Servicio disponible.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthResponse"
-              example:
-                ok: true
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
 
   /api/products:
     get:
-      tags:
-        - Products
+      tags: [Products]
       summary: Listar productos
-      description: Devuelve todos los productos existentes. La ruta no implementa paginación ni filtros.
       operationId: listProducts
       responses:
         "200":
@@ -58,19 +56,12 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Product"
-              example:
-                - id: 1
-                  title: Producto A
-                  description: null
-                  price: 9.99
-                  stock: 10
-                  createdAt: "2026-07-31T18:00:00.000Z"
-                  updatedAt: "2026-07-31T18:00:00.000Z"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
 
   /api/products/{id}:
     get:
-      tags:
-        - Products
+      tags: [Products]
       summary: Obtener un producto
       operationId: getProductById
       parameters:
@@ -82,29 +73,15 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Product"
-        "404":
-          description: No existe un producto con el identificador indicado.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-              example:
-                error: Not found
         "400":
-          description: El identificador no es un entero positivo.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-              example:
-                error: Invalid product id
+          $ref: "#/components/responses/InvalidIdentifier"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
   /api/auth/register:
     post:
-      tags:
-        - Authentication
-      summary: Registrar un usuario
-      description: Crea un usuario, cifra su contraseña con bcrypt y devuelve un JWT válido durante siete días.
+      tags: [Authentication]
+      summary: Registrar usuario y crear sesión
       operationId: registerUser
       requestBody:
         required: true
@@ -112,40 +89,29 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/CredentialsRequest"
-            example:
-              username: demo
-              password: demo-password
       responses:
         "200":
-          description: Usuario registrado y autenticado.
+          description: Sesión creada mediante cookie HttpOnly.
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+              description: Cookie de sesión HttpOnly, SameSite=Lax y Secure en producción.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/AuthResponse"
         "400":
-          description: Faltan campos o el nombre de usuario ya existe.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-              examples:
-                missingFields:
-                  summary: Faltan credenciales
-                  value:
-                    error: Missing fields
-                userExists:
-                  summary: Usuario duplicado
-                  value:
-                    error: User exists
+          $ref: "#/components/responses/BadRequest"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "429":
           $ref: "#/components/responses/TooManyRequests"
 
   /api/auth/login:
     post:
-      tags:
-        - Authentication
+      tags: [Authentication]
       summary: Iniciar sesión
-      description: Valida las credenciales y devuelve un JWT válido durante siete días.
       operationId: loginUser
       requestBody:
         required: true
@@ -153,38 +119,75 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/CredentialsRequest"
-            example:
-              username: demo
-              password: demo-password
       responses:
         "200":
-          description: Credenciales válidas.
+          description: Sesión creada mediante cookie HttpOnly.
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/AuthResponse"
         "400":
-          description: Credenciales ausentes, inválidas o incorrectas.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-              example:
-                error: Invalid credentials
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "429":
           $ref: "#/components/responses/TooManyRequests"
 
-  /api/cart:
+  /api/auth/me:
     get:
-      tags:
-        - Cart
-      summary: Consultar el carrito
-      operationId: getCart
+      tags: [Authentication]
+      summary: Restaurar la sesión actual
+      operationId: getCurrentUser
       security:
+        - cookieAuth: []
         - bearerAuth: []
       responses:
         "200":
-          description: Artículos del carrito con el producto asociado.
+          description: Usuario de la sesión.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/auth/logout:
+    post:
+      tags: [Authentication]
+      summary: Cerrar la sesión actual
+      operationId: logoutUser
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Cookie eliminada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/InvalidOrigin"
+
+  /api/cart:
+    get:
+      tags: [Cart]
+      summary: Consultar el carrito propio
+      operationId: getCart
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Líneas del carrito.
           content:
             application/json:
               schema:
@@ -194,63 +197,48 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
     post:
-      tags:
-        - Cart
-      summary: Añadir un producto al carrito
-      description: Si el producto ya está en el carrito, acumula la cantidad solicitada.
+      tags: [Cart]
+      summary: Añadir una cantidad al carrito
       operationId: addCartItem
       security:
+        - cookieAuth: []
         - bearerAuth: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CartAddRequest"
-            example:
-              productId: 1
-              qty: 1
+              $ref: "#/components/schemas/CartRequest"
       responses:
         "200":
-          description: Resumen actualizado del carrito, sin incluir los objetos de producto.
+          description: Carrito actualizado.
           content:
             application/json:
               schema:
                 type: array
                 items:
                   $ref: "#/components/schemas/CartItemSummary"
+        "400":
+          $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/InvalidOrigin"
         "404":
-          description: El producto indicado no existe.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-              example:
-                error: Product not found
-        "400":
-          description: El producto o la cantidad no son válidos.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/NotFound"
     put:
-      tags:
-        - Cart
-      summary: Reemplazar la cantidad de un producto
+      tags: [Cart]
+      summary: Reemplazar la cantidad de una línea
       operationId: updateCartItem
       security:
+        - cookieAuth: []
         - bearerAuth: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CartUpdateRequest"
-            example:
-              productId: 1
-              qty: 2
+              $ref: "#/components/schemas/CartRequest"
       responses:
         "200":
           description: Cantidad actualizada.
@@ -258,393 +246,389 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SuccessResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/InvalidOrigin"
         "404":
-          description: El producto no está en el carrito del usuario.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-              example:
-                error: Item not in cart
-        "400":
-          description: El producto o la cantidad no son válidos.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/NotFound"
 
   /api/cart/{productId}:
     delete:
-      tags:
-        - Cart
-      summary: Eliminar un producto del carrito
-      description: La operación devuelve éxito aunque el artículo ya no exista en el carrito.
+      tags: [Cart]
+      summary: Eliminar una línea del carrito
       operationId: deleteCartItem
       security:
+        - cookieAuth: []
         - bearerAuth: []
       parameters:
-        - $ref: "#/components/parameters/ProductIdForCart"
+        - $ref: "#/components/parameters/CartProductId"
       responses:
         "200":
-          description: Artículo eliminado o previamente ausente.
+          description: Línea eliminada o ya ausente.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/SuccessResponse"
+        "400":
+          $ref: "#/components/responses/InvalidIdentifier"
         "401":
           $ref: "#/components/responses/Unauthorized"
-        "400":
-          description: El identificador del producto no es válido.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          $ref: "#/components/responses/InvalidOrigin"
 
   /api/checkout:
     post:
-      tags:
-        - Orders
-      summary: Completar el checkout simulado
-      description: |
-        Valida inventario, calcula el total desde la base de datos, descuenta stock,
-        crea una orden con estado `paid`, copia los precios en los ítems y vacía el
-        carrito dentro de una transacción. No procesa un pago real.
+      tags: [Orders]
+      summary: Reservar inventario y crear un pedido pendiente
       operationId: checkoutCart
+      description: No cobra ni marca la orden como pagada. Una misma clave reutiliza el resultado anterior.
       security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: Pedido nuevo o reutilizado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderMutationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/InvalidOrigin"
+
+  /api/orders:
+    get:
+      tags: [Orders]
+      summary: Listar pedidos propios
+      operationId: listOrders
+      security:
+        - cookieAuth: []
         - bearerAuth: []
       responses:
         "200":
-          description: Orden simulada creada correctamente.
+          description: Pedidos del usuario autenticado.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/CheckoutResponse"
-              example:
-                ok: true
-                orderId: 12
-        "400":
-          description: El carrito está vacío o no existe inventario suficiente.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-              examples:
-                emptyCart:
-                  summary: Carrito vacío
-                  value:
-                    error: Cart empty
-                insufficientStock:
-                  summary: Inventario insuficiente
-                  value:
-                    error: Insufficient stock for Producto A
+                type: array
+                items:
+                  $ref: "#/components/schemas/Order"
         "401":
           $ref: "#/components/responses/Unauthorized"
-        "500":
-          description: La transacción de checkout no pudo completarse.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-              example:
-                error: Checkout failed
 
-  /api/orders/{orderId}/cancel:
-    post:
-      tags:
-        - Orders
-      summary: Cancelar una orden
-      description: |
-        Cancela una orden perteneciente al usuario, restaura el inventario y marca
-        la orden como `cancelled`. La operación es idempotente cuando la orden ya
-        se encontraba cancelada.
-      operationId: cancelOrder
+  /api/orders/{orderId}:
+    get:
+      tags: [Orders]
+      summary: Obtener un pedido propio
+      operationId: getOrder
       security:
+        - cookieAuth: []
         - bearerAuth: []
       parameters:
         - $ref: "#/components/parameters/OrderId"
       responses:
         "200":
-          description: Orden cancelada o previamente cancelada.
+          description: Pedido, líneas y resumen de pago.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SuccessResponse"
+                $ref: "#/components/schemas/Order"
+        "400":
+          $ref: "#/components/responses/InvalidIdentifier"
         "401":
           $ref: "#/components/responses/Unauthorized"
-        "400":
-          description: El identificador de la orden no es válido.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
         "404":
-          description: La orden no existe o no pertenece al usuario autenticado.
+          $ref: "#/components/responses/NotFound"
+
+  /api/orders/{orderId}/pay:
+    post:
+      tags: [Orders]
+      summary: Ejecutar el proveedor simulado
+      operationId: payOrder
+      description: Solo está habilitado en desarrollo y tests; es idempotente por estado.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                outcome:
+                  type: string
+                  enum: [paid, failed]
+                  default: paid
+      responses:
+        "200":
+          description: Resultado nuevo o reutilizado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderMutationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/InvalidOrigin"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          description: El proveedor simulado está deshabilitado.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
-              example:
-                error: Order not found
-        "500":
-          description: La cancelación no pudo completarse.
+
+  /api/orders/{orderId}/cancel:
+    post:
+      tags: [Orders]
+      summary: Cancelar un pedido y liberar su inventario una vez
+      operationId: cancelOrder
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      responses:
+        "200":
+          description: Cancelación nueva o reutilizada.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-              example:
-                error: Cancel failed
+                $ref: "#/components/schemas/OrderMutationResponse"
+        "400":
+          $ref: "#/components/responses/InvalidIdentifier"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/InvalidOrigin"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
 components:
   securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: mercado_session
+      description: En producción se usa el nombre endurecido __Host-mercado_session.
     bearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: JWT obtenido mediante registro o inicio de sesión.
+      description: Compatibilidad temporal para clientes no navegador.
 
   parameters:
     ProductId:
       name: id
       in: path
       required: true
-      description: Identificador del producto.
-      schema:
-        type: integer
-        format: int32
-      example: 1
-    ProductIdForCart:
+      schema: { type: integer, minimum: 1 }
+    CartProductId:
       name: productId
       in: path
       required: true
-      description: Identificador del producto que se eliminará del carrito.
-      schema:
-        type: integer
-        format: int32
-      example: 1
+      schema: { type: integer, minimum: 1 }
     OrderId:
       name: orderId
       in: path
       required: true
-      description: Identificador de la orden del usuario autenticado.
+      schema: { type: integer, minimum: 1 }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
       schema:
-        type: integer
-        format: int32
-      example: 12
+        type: string
+        minLength: 8
+        maxLength: 128
+        pattern: "^[A-Za-z0-9._:-]+$"
 
   responses:
-    Unauthorized:
-      description: Falta el token o el JWT es inválido, expiró o pertenece a un usuario inexistente.
+    BadRequest:
+      description: Entrada inválida.
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
-          examples:
-            missingToken:
-              summary: No se envió Authorization
-              value:
-                error: Missing token
-            invalidToken:
-              summary: Token inválido
-              value:
-                error: Invalid token
+    InvalidIdentifier:
+      description: El identificador no es un entero positivo.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Unauthorized:
+      description: Sesión ausente, inválida o expirada.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    InvalidOrigin:
+      description: Una mutación con cookie llegó desde un origen no autorizado.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: El recurso no existe o no pertenece al usuario.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Conflict:
+      description: El estado actual no permite la transición.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    PayloadTooLarge:
+      description: El JSON supera 10 KiB.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
     TooManyRequests:
       description: Se superó el límite temporal de solicitudes.
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
-          example:
-            error: Too many requests
 
   schemas:
-    HealthResponse:
-      type: object
-      required:
-        - ok
-      properties:
-        ok:
-          type: boolean
-          enum:
-            - true
-
     ErrorResponse:
       type: object
-      required:
-        - error
+      required: [error]
       properties:
-        error:
-          type: string
-
+        error: { type: string }
+    SuccessResponse:
+      type: object
+      required: [ok]
+      properties:
+        ok: { type: boolean, enum: [true] }
+    HealthResponse:
+      type: object
+      required: [status, version, timestamp]
+      properties:
+        status: { type: string, example: "ok - up" }
+        version: { type: string, example: "11/08/2026" }
+        timestamp: { type: string, format: date-time }
     CredentialsRequest:
       type: object
-      required:
-        - username
-        - password
+      required: [username, password]
       properties:
         username:
           type: string
-          pattern: "^[a-zA-Z0-9_.-]{3,64}$"
           minLength: 3
           maxLength: 64
-          example: demo
+          pattern: "^[a-zA-Z0-9_.-]+$"
         password:
           type: string
           format: password
           minLength: 12
           maxLength: 128
           writeOnly: true
-          example: demo-password
-
     PublicUser:
       type: object
-      required:
-        - id
-        - username
+      required: [id, username]
       properties:
-        id:
-          type: integer
-          format: int32
-          example: 1
-        username:
-          type: string
-          example: demo
-
+        id: { type: integer }
+        username: { type: string }
     AuthResponse:
       type: object
-      required:
-        - token
-        - user
+      required: [user]
       properties:
-        token:
-          type: string
-          description: JWT con una vigencia de siete días.
-          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.example.signature
         user:
           $ref: "#/components/schemas/PublicUser"
-
+        token:
+          type: string
+          description: Solo aparece si ALLOW_BEARER_AUTH=true y X-Auth-Transport=bearer.
     Product:
       type: object
-      required:
-        - id
-        - title
-        - description
-        - price
-        - stock
-        - createdAt
-        - updatedAt
+      required: [id, title, price, stock]
       properties:
-        id:
-          type: integer
-          format: int32
-          example: 1
-        title:
-          type: string
-          example: Producto A
-        description:
-          type: string
-          nullable: true
-          example: null
-        price:
-          type: number
-          format: float
-          description: Importe almacenado actualmente como FLOAT.
-          example: 9.99
-        stock:
-          type: integer
-          format: int32
-          example: 10
-        createdAt:
-          type: string
-          format: date-time
-          readOnly: true
-          example: "2026-07-31T18:00:00.000Z"
-        updatedAt:
-          type: string
-          format: date-time
-          readOnly: true
-          example: "2026-07-31T18:00:00.000Z"
-
-    CartAddRequest:
+        id: { type: integer }
+        title: { type: string }
+        description: { type: string, nullable: true }
+        price: { type: number, format: double, example: 9.99 }
+        stock: { type: integer, minimum: 0 }
+    CartRequest:
       type: object
-      required:
-        - productId
+      required: [productId, qty]
       properties:
-        productId:
-          type: integer
-          format: int32
-          example: 1
-        qty:
-          type: integer
-          default: 1
-          minimum: 1
-          maximum: 100
-          description: Cantidad entera positiva; la cantidad acumulada de la línea no puede superar 100.
-          example: 1
-
-    CartUpdateRequest:
-      type: object
-      required:
-        - productId
-        - qty
-      properties:
-        productId:
-          type: integer
-          format: int32
-          example: 1
-        qty:
-          type: integer
-          minimum: 1
-          maximum: 100
-          description: Reemplaza la cantidad de la línea y debe estar entre 1 y 100.
-          example: 2
-
+        productId: { type: integer, minimum: 1 }
+        qty: { type: integer, minimum: 1, maximum: 100 }
     CartItemSummary:
       type: object
-      required:
-        - productId
-        - qty
+      required: [productId, qty]
       properties:
-        productId:
-          type: integer
-          format: int32
-          example: 1
-        qty:
-          type: integer
-          example: 2
-
+        productId: { type: integer }
+        qty: { type: integer }
     CartItemDetailed:
       allOf:
         - $ref: "#/components/schemas/CartItemSummary"
         - type: object
-          required:
-            - product
+          required: [product]
           properties:
             product:
               $ref: "#/components/schemas/Product"
-
-    SuccessResponse:
+    OrderItem:
       type: object
-      required:
-        - ok
+      required: [id, ProductId, qty, price]
       properties:
-        ok:
-          type: boolean
-          enum:
-            - true
-
-    CheckoutResponse:
+        id: { type: integer }
+        ProductId: { type: integer }
+        qty: { type: integer }
+        price: { type: number, format: double }
+    PaymentSummary:
       type: object
-      required:
-        - ok
-        - orderId
+      nullable: true
+      required: [status, provider, amountCents, currency]
       properties:
-        ok:
-          type: boolean
-          enum:
-            - true
+        status:
+          type: string
+          enum: [pending, paid, failed, cancelled, refunded]
+        provider: { type: string, enum: [simulated] }
+        amountCents: { type: integer, minimum: 0 }
+        currency: { type: string, example: MXN }
+    Order:
+      type: object
+      required: [id, status, total, items, payment]
+      properties:
+        id: { type: integer }
+        status:
+          type: string
+          enum: [pending_payment, paid, payment_failed, cancelled]
+        total: { type: number, format: double }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderItem"
+        payment:
+          $ref: "#/components/schemas/PaymentSummary"
+    OrderMutationResponse:
+      type: object
+      required: [ok, replayed, order]
+      properties:
+        ok: { type: boolean, enum: [true] }
         orderId:
           type: integer
-          format: int32
-          example: 12
+          description: Alias conservado en la respuesta de checkout.
+        replayed: { type: boolean }
+        order:
+          $ref: "#/components/schemas/Order"

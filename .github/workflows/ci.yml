@@ -6,13 +6,39 @@ on:
   pull_request:
     branches: [master, main]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   backend:
-    name: Backend (typecheck + tests + coverage)
+    name: Backend (PostgreSQL + tests + audit)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: backend
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: marketplace_ci
+          POSTGRES_USER: marketplace
+          POSTGRES_PASSWORD: marketplace-ci-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U marketplace -d marketplace_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://marketplace:marketplace-ci-password@localhost:5432/marketplace_ci
+      DATABASE_SSL: "false"
+      JWT_SECRET: ci-only-secret-must-be-at-least-32-characters-long
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,13 +58,22 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Audit production dependencies
+        run: pnpm audit --prod --audit-level moderate
+
+      - name: Apply PostgreSQL migrations
+        run: pnpm run migrate
+        env:
+          NODE_ENV: ci
+
       - name: Typecheck
         run: pnpm run typecheck
 
       - name: Tests with coverage
         run: pnpm run test:coverage
-        env:
-          JWT_SECRET: ci-only-secret-must-be-at-least-32-characters-long
+
+      - name: Build
+        run: pnpm run build
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
@@ -48,8 +83,9 @@ jobs:
           retention-days: 7
 
   frontend:
-    name: Frontend (typecheck + tests + coverage)
+    name: Frontend (tests + build + audit)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: frontend
@@ -72,11 +108,17 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Audit dependencies
+        run: pnpm audit --audit-level moderate
+
       - name: Typecheck
         run: pnpm run typecheck
 
       - name: Tests with coverage
         run: pnpm run test:coverage
+
+      - name: Build
+        run: pnpm run build
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
@@ -85,33 +127,65 @@ jobs:
           path: frontend/coverage/lcov.info
           retention-days: 7
 
-  sonarcloud:
-    name: SonarCloud Quality Gate
+  containers:
+    name: Compose smoke test
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: [backend, frontend]
-    # Los forks no tienen acceso a secrets del repo; sin SONAR_TOKEN este job
-    # se saltaria igual, pero lo dejamos explicito para que sea claro por que.
-    if: github.event.pull_request.head.repo.full_name == github.repository || github.event_name == 'push'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Validate Compose
+        run: docker compose config --quiet
+
+      - name: Build and start stack
+        run: docker compose up --build --detach --wait
+
+      - name: Smoke test API and frontend security headers
+        run: |
+          curl --fail --silent --show-error http://127.0.0.1:4000/api/health
+          curl --fail --silent --show-error http://127.0.0.1:3000/api/products
+          curl --fail --silent --show-error --head http://127.0.0.1:3000/ | grep -i "content-security-policy"
+
+      - name: Show container logs on failure
+        if: failure()
+        run: docker compose logs --no-color
+
+      - name: Stop stack
+        if: always()
+        run: docker compose down --volumes
+
+  sonarcloud:
+    name: SonarCloud Quality Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [backend, frontend]
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    steps:
+      - name: Checkout
+        if: env.SONAR_TOKEN != ''
+        uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # SonarCloud necesita el historial completo para blame/PR analysis
+          fetch-depth: 0
 
       - name: Download backend coverage
+        if: env.SONAR_TOKEN != ''
         uses: actions/download-artifact@v4
         with:
           name: backend-coverage
           path: backend/coverage
 
       - name: Download frontend coverage
+        if: env.SONAR_TOKEN != ''
         uses: actions/download-artifact@v4
         with:
           name: frontend-coverage
           path: frontend/coverage
 
       - name: SonarCloud Scan
+        if: env.SONAR_TOKEN != ''
         uses: sonarsource/sonarqube-scan-action@v4
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

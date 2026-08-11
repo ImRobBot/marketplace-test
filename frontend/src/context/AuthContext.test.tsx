@@ -56,7 +56,7 @@ describe('AuthContext', () => {
     expect(await screen.findByTestId('user')).toHaveTextContent('carol')
     expect(screen.getByTestId('ready')).toHaveTextContent('ready')
     expect(mockedGet).toHaveBeenCalledWith(
-      'http://localhost:4000/api/auth/me',
+      '/api/auth/me',
       { withCredentials: true }
     )
     expect(localStorage.getItem('token')).toBeNull()
@@ -78,7 +78,7 @@ describe('AuthContext', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Login' }))
     await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('alice'))
     expect(mockedPost).toHaveBeenCalledWith(
-      'http://localhost:4000/api/auth/login',
+      '/api/auth/login',
       { username: 'alice', password: 'secret123456' },
       { withCredentials: true }
     )
@@ -90,7 +90,7 @@ describe('AuthContext', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Logout' }))
     await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('none'))
     expect(mockedPost).toHaveBeenLastCalledWith(
-      'http://localhost:4000/api/auth/logout',
+      '/api/auth/logout',
       {},
       { withCredentials: true }
     )
@@ -101,7 +101,7 @@ describe('AuthContext', () => {
     renderProvider()
 
     expect(mockedCreate).toHaveBeenCalledWith({
-      baseURL: 'http://localhost:4000',
+      baseURL: '',
       withCredentials: true
     })
   })

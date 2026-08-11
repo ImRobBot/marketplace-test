@@ -66,7 +66,7 @@ describe('authentication pages', () => {
     submitForm('Entrar')
 
     await waitFor(() => expect(mockedPost).toHaveBeenCalledWith(
-      'http://localhost:4000/api/auth/login',
+      '/api/auth/login',
       { username: 'alice', password: 'secret123456' },
       { withCredentials: true }
     ))
@@ -96,7 +96,7 @@ describe('authentication pages', () => {
     submitForm('Crear cuenta')
 
     await waitFor(() => expect(mockedPost).toHaveBeenCalledWith(
-      'http://localhost:4000/api/auth/register',
+      '/api/auth/register',
       { username: 'bob', password: 'secret123456' },
       { withCredentials: true }
     ))
