@@ -13,5 +13,14 @@ export function getRedirectTarget(state: unknown): string {
   if (typeof state !== 'object' || state === null || !('from' in state)) return '/'
 
   const { from } = state as { from?: unknown }
-  return typeof from === 'string' && from.startsWith('/') ? from : '/'
+  if (typeof from !== 'string' || !from.startsWith('/') || from.startsWith('//') || from.includes('\\')) {
+    return '/'
+  }
+
+  try {
+    const target = new URL(from, 'http://marketplace.local')
+    return target.origin === 'http://marketplace.local' ? from : '/'
+  } catch {
+    return '/'
+  }
 }

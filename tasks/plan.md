@@ -44,6 +44,8 @@ Endurecer los límites de la API y proteger los flujos de carrito, checkout y ca
 - Sustituir precios `FLOAT` por centavos enteros o `DECIMAL` y añadir migraciones.
 - Sustituir el rate limiting en memoria por un almacén compartido cuando haya más de un proceso.
 - Añadir paginación al catálogo y preparar SQLite para una base de datos de producción.
+- Migrar React Router desde 6.30.4 a una línea parcheada compatible; la versión 6.30.5 indicada por la auditoría no está publicada.
+- Revisar la cadena transitiva `sqlite3 → node-gyp → tar` y `sequelize → uuid`; la auditoría actual reporta vulnerabilidades de build/transitivas que no deben resolverse con `audit fix --force`.
 
 ## Riesgos y mitigaciones
 

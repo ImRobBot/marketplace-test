@@ -16,6 +16,8 @@ describe('domain utilities', () => {
   it('validates redirect targets', () => {
     expect(getRedirectTarget({ from: '/cart' })).toBe('/cart')
     expect(getRedirectTarget({ from: 'https://evil.example' })).toBe('/')
+    expect(getRedirectTarget({ from: '//evil.example' })).toBe('/')
+    expect(getRedirectTarget({ from: '/\\evil.example' })).toBe('/')
     expect(getRedirectTarget(null)).toBe('/')
     expect(getRedirectTarget({})).toBe('/')
   })
