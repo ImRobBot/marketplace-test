@@ -4,9 +4,10 @@ import cors from 'cors';
 import express, { type Express } from 'express';
 import pinoHttp from 'pino-http';
 
+import { runMigrations } from './database/migrator';
 import { logger } from './logger';
 import { asyncHandler, errorHandler, notFoundHandler } from './middleware/errors';
-import { models, Product, sequelize, User } from './models';
+import { databaseDialect, models, Product, sequelize, User } from './models';
 import { createAuthRouter } from './routes/auth';
 import { createCartRouter } from './routes/cart';
 import { rateLimit, securityHeaders } from './middleware/security';
@@ -27,7 +28,11 @@ export function createApp(): Express {
   app.use(rateLimit());
 
   app.get('/api/health', (_req, res) => {
-    res.json({ ok: true });
+    res.json({
+      status: 'ok - up',
+      version: '11/08/2026',
+      timestamp: new Date().toISOString()
+    });
   });
 
   app.get('/api/products', asyncHandler(async (_req, res) => {
@@ -61,7 +66,12 @@ export function createApp(): Express {
 }
 
 export async function initializeApp(): Promise<void> {
-  await sequelize.sync();
+  if (databaseDialect === 'sqlite') {
+    await sequelize.sync();
+  } else {
+    await sequelize.authenticate();
+    await runMigrations(sequelize);
+  }
 
   const productCount = await Product.count();
   if (productCount === 0) {

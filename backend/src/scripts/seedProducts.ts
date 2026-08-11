@@ -1,5 +1,6 @@
 import { productCatalog, type ProductCatalogItem } from '../data/productCatalog';
-import { Product, sequelize } from '../models';
+import { runMigrations } from '../database/migrator';
+import { databaseDialect, Product, sequelize } from '../models';
 
 interface SeedResult {
   created: number;
@@ -32,7 +33,12 @@ function assertExpectedExistingProduct(
 }
 
 async function synchronizeProductCatalog(): Promise<SeedResult> {
-  await sequelize.sync();
+  if (databaseDialect === 'sqlite') {
+    await sequelize.sync();
+  } else {
+    await sequelize.authenticate();
+    await runMigrations(sequelize);
+  }
 
   return sequelize.transaction(async (transaction) => {
     const catalogById = new Map(productCatalog.map((product) => [product.id, product]));

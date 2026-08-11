@@ -59,7 +59,11 @@ describe('API validation and protected workflows', () => {
   it('serves health, products and security headers', async () => {
     const health = await request(app).get('/api/health').expect(200);
 
-    expect(health.body).toEqual({ ok: true });
+    expect(health.body).toMatchObject({
+      status: 'ok - up',
+      version: '11/08/2026'
+    });
+    expect(Date.parse(health.body.timestamp as string)).not.toBeNaN();
     expect(health.headers['x-content-type-options']).toBe('nosniff');
     expect(health.headers['x-frame-options']).toBe('DENY');
     expect(health.headers['referrer-policy']).toBe('no-referrer');
