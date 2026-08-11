@@ -1,7 +1,10 @@
 import { Router } from 'express';
+import { Op } from 'sequelize';
 
 import { createAuthMiddleware } from '../middleware/auth';
+import { asyncHandler } from '../middleware/errors';
 import type { CartItem, Models, Product } from '../models';
+import { isCartQuantity, isRecord, parsePositiveInteger } from '../validation';
 
 interface CartRoutesDependencies {
   models: Models;
@@ -12,8 +15,26 @@ interface CartBody {
   qty?: unknown;
 }
 
-function validQuantity(value: unknown): value is number {
-  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 1 && value <= 100;
+const cancellationLocks = new Map<number, Promise<void>>();
+
+async function withCancellationLock<T>(orderId: number, action: () => Promise<T>): Promise<T> {
+  const previous = cancellationLocks.get(orderId) ?? Promise.resolve();
+  let release!: () => void;
+  const current = new Promise<void>(resolve => {
+    release = resolve;
+  });
+  const queued = previous.then(() => current);
+  cancellationLocks.set(orderId, queued);
+
+  await previous;
+  try {
+    return await action();
+  } finally {
+    release();
+    if (cancellationLocks.get(orderId) === queued) {
+      cancellationLocks.delete(orderId);
+    }
+  }
 }
 
 function includedProduct(item: CartItem): Product {
@@ -28,7 +49,7 @@ export function createCartRouter({ models }: CartRoutesDependencies): Router {
   const router = Router();
   const auth = createAuthMiddleware(models);
 
-  router.get('/cart', auth, async (req, res) => {
+  router.get('/cart', auth, asyncHandler(async (req, res) => {
     const items = await models.CartItem.findAll({
       where: { UserId: req.user!.id },
       include: [models.Product]
@@ -41,13 +62,14 @@ export function createCartRouter({ models }: CartRoutesDependencies): Router {
         product: item.Product
       }))
     );
-  });
+  }));
 
-  router.post('/cart', auth, async (req, res) => {
-    const { productId: rawProductId, qty: rawQty } = req.body as CartBody;
-    const productId = Number(rawProductId);
+  router.post('/cart', auth, asyncHandler(async (req, res) => {
+    const body = isRecord(req.body) ? req.body : {};
+    const { productId: rawProductId, qty: rawQty } = body as CartBody;
+    const productId = parsePositiveInteger(rawProductId);
     const qty = rawQty === undefined ? 1 : rawQty;
-    if (!Number.isSafeInteger(productId) || !validQuantity(qty)) {
+    if (productId === null || !isCartQuantity(qty)) {
       res.status(400).json({ error: 'Invalid product or quantity' });
       return;
     }
@@ -62,7 +84,13 @@ export function createCartRouter({ models }: CartRoutesDependencies): Router {
       defaults: { qty }
     });
 
-    item.qty = created ? qty : item.qty + qty;
+    const nextQuantity = created ? qty : item.qty + qty;
+    if (!isCartQuantity(nextQuantity)) {
+      res.status(400).json({ error: 'Invalid quantity' });
+      return;
+    }
+
+    item.qty = nextQuantity;
     await item.save();
 
     const items = await models.CartItem.findAll({
@@ -71,12 +99,19 @@ export function createCartRouter({ models }: CartRoutesDependencies): Router {
     });
 
     res.json(items.map((cartItem) => ({ productId: cartItem.ProductId, qty: cartItem.qty })));
-  });
+  }));
 
-  router.put('/cart', auth, async (req, res) => {
-    const { productId, qty } = req.body as CartBody;
+  router.put('/cart', auth, asyncHandler(async (req, res) => {
+    const body = isRecord(req.body) ? req.body : {};
+    const { productId: rawProductId, qty } = body as CartBody;
+    const productId = parsePositiveInteger(rawProductId);
+    if (productId === null || !isCartQuantity(qty)) {
+      res.status(400).json({ error: 'Invalid product or quantity' });
+      return;
+    }
+
     const item = await models.CartItem.findOne({
-      where: { UserId: req.user!.id, ProductId: Number(productId) }
+      where: { UserId: req.user!.id, ProductId: productId }
     });
 
     if (!item) {
@@ -84,25 +119,26 @@ export function createCartRouter({ models }: CartRoutesDependencies): Router {
       return;
     }
 
-    if (!validQuantity(qty)) {
-      res.status(400).json({ error: 'Invalid quantity' });
-      return;
-    }
     item.qty = qty;
     await item.save();
     res.json({ ok: true });
-  });
+  }));
 
-  router.delete('/cart/:productId', auth, async (req, res) => {
-    const productId = Number(req.params.productId);
+  router.delete('/cart/:productId', auth, asyncHandler(async (req, res) => {
+    const productId = parsePositiveInteger(req.params.productId);
+    if (productId === null) {
+      res.status(400).json({ error: 'Invalid product id' });
+      return;
+    }
+
     await models.CartItem.destroy({
       where: { UserId: req.user!.id, ProductId: productId }
     });
 
     res.json({ ok: true });
-  });
+  }));
 
-  router.post('/checkout', auth, async (req, res) => {
+  router.post('/checkout', auth, asyncHandler(async (req, res) => {
     const transaction = await models.sequelize.transaction();
 
     try {
@@ -161,45 +197,70 @@ export function createCartRouter({ models }: CartRoutesDependencies): Router {
       await transaction.rollback();
       res.status(500).json({ error: 'Checkout failed' });
     }
-  });
+  }));
 
-  router.post('/orders/:orderId/cancel', auth, async (req, res) => {
-    const order = await models.Order.findOne({
-      where: { id: Number(req.params.orderId), UserId: req.user!.id },
-      include: [{ model: models.OrderItem, as: 'items' }]
-    });
-
-    if (!order) {
-      res.status(404).json({ error: 'Order not found' });
+  router.post('/orders/:orderId/cancel', auth, asyncHandler(async (req, res) => {
+    const orderId = parsePositiveInteger(req.params.orderId);
+    if (orderId === null) {
+      res.status(400).json({ error: 'Invalid order id' });
       return;
     }
 
-    if (order.status === 'cancelled') {
-      res.json({ ok: true });
-      return;
-    }
+    await withCancellationLock(orderId, async () => {
+      const transaction = await models.sequelize.transaction();
+      try {
+        const [updatedCount] = await models.Order.update(
+          { status: 'cancelled' },
+          {
+            where: {
+              id: orderId,
+              UserId: req.user!.id,
+              status: { [Op.ne]: 'cancelled' }
+            },
+            transaction
+          }
+        );
 
-    const transaction = await models.sequelize.transaction();
-    try {
-      for (const item of order.items ?? []) {
-        const product = await models.Product.findByPk(item.ProductId);
-        if (!product) {
-          throw new Error(`Product ${item.ProductId} not found`);
+        const order = await models.Order.findOne({
+          where: { id: orderId, UserId: req.user!.id },
+          include: [{ model: models.OrderItem, as: 'items' }],
+          transaction,
+          lock: transaction.LOCK.UPDATE
+        });
+
+        if (!order) {
+          await transaction.rollback();
+          res.status(404).json({ error: 'Order not found' });
+          return;
         }
 
-        product.stock += item.qty;
-        await product.save({ transaction });
-      }
+        if (updatedCount === 0) {
+          await transaction.commit();
+          res.json({ ok: true });
+          return;
+        }
 
-      order.status = 'cancelled';
-      await order.save({ transaction });
-      await transaction.commit();
-      res.json({ ok: true });
-    } catch {
-      await transaction.rollback();
-      res.status(500).json({ error: 'Cancel failed' });
-    }
-  });
+        for (const item of order.items ?? []) {
+          const product = await models.Product.findByPk(item.ProductId, {
+            transaction,
+            lock: transaction.LOCK.UPDATE
+          });
+          if (!product) {
+            throw new Error(`Product ${item.ProductId} not found`);
+          }
+
+          product.stock += item.qty;
+          await product.save({ transaction });
+        }
+
+        await transaction.commit();
+        res.json({ ok: true });
+      } catch {
+        await transaction.rollback();
+        res.status(500).json({ error: 'Cancel failed' });
+      }
+    });
+  }));
 
   return router;
 }

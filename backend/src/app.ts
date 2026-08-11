@@ -5,10 +5,12 @@ import express, { type Express } from 'express';
 import pinoHttp from 'pino-http';
 
 import { logger } from './logger';
+import { asyncHandler, errorHandler, notFoundHandler } from './middleware/errors';
 import { models, Product, sequelize, User } from './models';
 import { createAuthRouter } from './routes/auth';
 import { createCartRouter } from './routes/cart';
 import { rateLimit, securityHeaders } from './middleware/security';
+import { parsePositiveInteger } from './validation';
 
 export function createApp(): Express {
   const app = express();
@@ -28,23 +30,32 @@ export function createApp(): Express {
     res.json({ ok: true });
   });
 
-  app.get('/api/products', async (_req, res) => {
+  app.get('/api/products', asyncHandler(async (_req, res) => {
     const products = await Product.findAll({ order: [['id', 'ASC']] });
     res.json(products);
-  });
+  }));
 
-  app.get('/api/products/:id', async (req, res) => {
-    const product = await Product.findByPk(Number(req.params.id));
+  app.get('/api/products/:id', asyncHandler(async (req, res) => {
+    const productId = parsePositiveInteger(req.params.id);
+    if (productId === null) {
+      res.status(400).json({ error: 'Invalid product id' });
+      return;
+    }
+
+    const product = await Product.findByPk(productId);
     if (!product) {
       res.status(404).json({ error: 'Not found' });
       return;
     }
 
     res.json(product);
-  });
+  }));
 
+  app.use('/api/auth', rateLimit({ windowMs: 60_000, maxRequests: 20 }));
   app.use('/api/auth', createAuthRouter({ models: { User } }));
   app.use('/api', createCartRouter({ models }));
+  app.use(notFoundHandler());
+  app.use(errorHandler);
 
   return app;
 }

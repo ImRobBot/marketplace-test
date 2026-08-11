@@ -71,10 +71,20 @@ describe('API validation and protected workflows', () => {
 
     await request(app).get('/api/products/1').expect(200);
     await request(app).get('/api/products/999').expect(404);
+    await request(app)
+      .get('/api/products/not-an-id')
+      .expect(400)
+      .expect({ error: 'Invalid product id' });
   });
 
   it('validates credentials and rejects duplicate or invalid logins', async () => {
     await request(app).post('/api/auth/register').send({}).expect(400);
+    await request(app)
+      .post('/api/auth/register')
+      .set('Content-Type', 'application/json')
+      .send('null')
+      .expect(400)
+      .expect({ error: 'Invalid JSON' });
     const invalidPassword = await request(app)
       .post('/api/auth/register')
       .send({ username: 'ab', password: 'short' })
@@ -181,6 +191,45 @@ describe('API validation and protected workflows', () => {
     expect((await authenticated(token).get('/api/cart').expect(200)).body).toEqual([]);
   });
 
+  it('rejects cart quantities that exceed the per-line maximum after accumulation', async () => {
+    const token = await register('quantity-limit');
+
+    await authenticated(token).post('/api/cart').send({ productId: 1, qty: 60 }).expect(200);
+    await authenticated(token)
+      .post('/api/cart')
+      .send({ productId: 1, qty: 41 })
+      .expect(400)
+      .expect({ error: 'Invalid quantity' });
+
+    const cart = await authenticated(token).get('/api/cart').expect(200);
+    expect(cart.body[0].qty).toBe(60);
+  });
+
+  it('rejects invalid cart and order identifiers at the API boundary', async () => {
+    const token = await register('identifier-validation');
+
+    await authenticated(token)
+      .put('/api/cart')
+      .send({ productId: 'not-an-id', qty: 1 })
+      .expect(400)
+      .expect({ error: 'Invalid product or quantity' });
+    await authenticated(token)
+      .delete('/api/cart/not-an-id')
+      .expect(400)
+      .expect({ error: 'Invalid product id' });
+    await authenticated(token)
+      .post('/api/orders/not-an-id/cancel')
+      .expect(400)
+      .expect({ error: 'Invalid order id' });
+  });
+
+  it('returns JSON for unknown routes', async () => {
+    await request(app)
+      .get('/api/does-not-exist')
+      .expect(404)
+      .expect({ error: 'Not found' });
+  });
+
   it('rejects empty carts and insufficient stock during checkout', async () => {
     const token = await register();
 
@@ -209,5 +258,21 @@ describe('API validation and protected workflows', () => {
 
     const order = await Order.findByPk(orderId);
     expect(order?.status).toBe('cancelled');
+  });
+
+  it('restores stock only once when cancellation requests overlap', async () => {
+    const token = await register('concurrent-cancel');
+
+    await authenticated(token).post('/api/cart').send({ productId: 1, qty: 1 }).expect(200);
+    const checkout = await authenticated(token).post('/api/checkout').expect(200);
+    const orderId = checkout.body.orderId as number;
+
+    const responses = await Promise.all([
+      authenticated(token).post(`/api/orders/${orderId}/cancel`),
+      authenticated(token).post(`/api/orders/${orderId}/cancel`)
+    ]);
+
+    expect(responses.map(response => response.status)).toEqual([200, 200]);
+    expect((await Product.findByPk(1))?.stock).toBe(10);
   });
 });

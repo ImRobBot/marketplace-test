@@ -2,7 +2,9 @@ import bcrypt from 'bcryptjs';
 import { Router } from 'express';
 import jwt from 'jsonwebtoken';
 
+import { asyncHandler } from '../middleware/errors';
 import type { Models } from '../models';
+import { isRecord } from '../validation';
 
 interface AuthRoutesDependencies {
   models: Pick<Models, 'User'>;
@@ -20,8 +22,9 @@ export function createAuthRouter({ models }: AuthRoutesDependencies): Router {
     throw new Error('JWT_SECRET must be configured with at least 32 characters');
   }
 
-  router.post('/register', async (req, res) => {
-    const { username, password } = req.body as CredentialsBody;
+  router.post('/register', asyncHandler(async (req, res) => {
+    const body = isRecord(req.body) ? req.body : {};
+    const { username, password } = body as CredentialsBody;
     if (typeof username !== 'string' || !/^[a-zA-Z0-9_.-]{3,64}$/.test(username)) {
       res.status(400).json({ error: 'Invalid username' });
       return;
@@ -39,18 +42,26 @@ export function createAuthRouter({ models }: AuthRoutesDependencies): Router {
       return;
     }
 
-    const passwordHash = await bcrypt.hash(password, 8);
+    const passwordHash = await bcrypt.hash(password, 12);
     const user = await models.User.create({ username: normalizedUsername, passwordHash });
     const token = jwt.sign({ sub: user.id, username: user.username }, jwtSecret, {
       expiresIn: '7d'
     });
 
     res.json({ token, user: { id: user.id, username: user.username } });
-  });
+  }));
 
-  router.post('/login', async (req, res) => {
-    const { username, password } = req.body as CredentialsBody;
-    if (typeof username !== 'string' || typeof password !== 'string' || username.length > 64 || password.length > 128) {
+  router.post('/login', asyncHandler(async (req, res) => {
+    const body = isRecord(req.body) ? req.body : {};
+    const { username, password } = body as CredentialsBody;
+    if (
+      typeof username !== 'string' ||
+      typeof password !== 'string' ||
+      username.length < 3 ||
+      username.length > 64 ||
+      !/^[a-zA-Z0-9_.-]+$/.test(username) ||
+      password.length > 128
+    ) {
       res.status(400).json({ error: 'Invalid credentials' });
       return;
     }
@@ -72,7 +83,7 @@ export function createAuthRouter({ models }: AuthRoutesDependencies): Router {
     });
 
     res.json({ token, user: { id: user.id, username: user.username } });
-  });
+  }));
 
   return router;
 }
