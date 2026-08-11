@@ -1,6 +1,7 @@
 import type { RequestHandler } from 'express';
 import jwt from 'jsonwebtoken';
 
+import { readSessionCookie } from '../auth/session';
 import type { Models } from '../models';
 
 type AuthModels = Pick<Models, 'User'>;
@@ -13,19 +14,37 @@ export function createAuthMiddleware(models: AuthModels): RequestHandler {
 
   return async (req, res, next) => {
     const authorization = req.headers.authorization;
-    if (!authorization) {
+    const cookieToken = readSessionCookie(req);
+    let token: string | null = null;
+    let usesCookie = false;
+
+    if (authorization) {
+      const parts = authorization.split(' ');
+      if (parts.length !== 2 || parts[0].toLowerCase() !== 'bearer' || !parts[1]) {
+        res.status(401).json({ error: 'Invalid token' });
+        return;
+      }
+      token = parts[1];
+    } else if (cookieToken) {
+      token = cookieToken;
+      usesCookie = true;
+    }
+
+    if (!token) {
       res.status(401).json({ error: 'Missing token' });
       return;
     }
 
-    const parts = authorization.split(' ');
-    if (parts.length !== 2 || parts[0].toLowerCase() !== 'bearer' || !parts[1]) {
-      res.status(401).json({ error: 'Invalid token' });
-      return;
+    if (usesCookie && !['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
+      const allowedOrigin = process.env.CORS_ORIGIN || 'http://localhost:3000';
+      if (req.headers.origin !== allowedOrigin) {
+        res.status(403).json({ error: 'Invalid request origin' });
+        return;
+      }
     }
 
     try {
-      const payload = jwt.verify(parts[1], jwtSecret);
+      const payload = jwt.verify(token, jwtSecret, { algorithms: ['HS256'] });
       if (typeof payload === 'string' || payload.sub == null) {
         res.status(401).json({ error: 'Invalid token' });
         return;

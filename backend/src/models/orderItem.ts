@@ -33,7 +33,7 @@ export function initOrderItemModel(sequelize: Sequelize): typeof OrderItem {
         defaultValue: 1
       },
       price: {
-        type: DataTypes.FLOAT,
+        type: DataTypes.DECIMAL(12, 2),
         allowNull: false,
         defaultValue: 0
       }

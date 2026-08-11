@@ -12,7 +12,7 @@ import type { Feedback, Product as ProductData } from '../types'
 
 export default function Product() {
   const { id } = useParams<{ id: string }>()
-  const { authAxios, token } = useAuth()
+  const { authAxios, user } = useAuth()
   const [product, setProduct] = useState<ProductData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -102,7 +102,7 @@ export default function Product() {
         <ProductBuyBox
           product={product}
           productId={id}
-          authenticated={Boolean(token)}
+          authenticated={Boolean(user)}
           outOfStock={outOfStock}
           quantity={quantity}
           adding={adding}

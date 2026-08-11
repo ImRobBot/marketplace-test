@@ -18,6 +18,10 @@ describe('security middleware', () => {
       'Permissions-Policy',
       'camera=(), microphone=(), geolocation=()'
     );
+    expect(setHeader).toHaveBeenCalledWith(
+      'Content-Security-Policy',
+      "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
+    );
     expect(next).toHaveBeenCalledTimes(1);
   });
 
@@ -39,5 +43,22 @@ describe('security middleware', () => {
     expect(status).toHaveBeenCalledWith(429);
     expect(setHeader).toHaveBeenCalledWith('Retry-After', expect.any(Number));
     expect(json).toHaveBeenCalledWith({ error: 'Too many requests' });
+  });
+
+  it('supports stricter limits for sensitive route groups', () => {
+    const middleware = rateLimit({ maxRequests: 1 });
+    const next = jest.fn() as NextFunction;
+    const response = {
+      setHeader: jest.fn(),
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn()
+    } as unknown as Response;
+    const request = { ip: `sensitive-client-${Date.now()}-${Math.random()}` } as Request;
+
+    middleware(request, response, next);
+    middleware(request, response, next);
+
+    expect(next).toHaveBeenCalledTimes(1);
+    expect(response.status).toHaveBeenCalledWith(429);
   });
 });

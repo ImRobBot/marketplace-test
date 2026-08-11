@@ -17,7 +17,7 @@ export default function Home() {
   const { query, setQuery, applyDepartment, clearSearch } = useCatalogQuery()
   const [addingId, setAddingId] = useState<number | null>(null)
   const [feedback, setFeedback] = useState<Feedback | null>(null)
-  const { authAxios, token } = useAuth()
+  const { authAxios, user } = useAuth()
 
   const visibleProducts = useMemo(
     () => filterProducts(products, query),
@@ -59,7 +59,7 @@ export default function Home() {
   return (
     <>
       <HomeHero
-        authenticated={Boolean(token)}
+        authenticated={Boolean(user)}
         loading={loading}
         productCount={products.length}
       />
@@ -79,7 +79,7 @@ export default function Home() {
         query={query}
         feedback={feedback}
         addingId={addingId}
-        authenticated={Boolean(token)}
+        authenticated={Boolean(user)}
         onQueryChange={setQuery}
         onClear={clearSearch}
         onRetry={retry}

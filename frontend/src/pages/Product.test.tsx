@@ -40,7 +40,8 @@ beforeEach(() => {
   vi.clearAllMocks()
   mockedUseAuth.mockReturnValue({
     authAxios,
-    token: 'token'
+    user: { id: 1, username: 'alice' },
+    authReady: true
   } as unknown as ReturnType<typeof useAuth>)
 })
 
@@ -88,7 +89,8 @@ describe('Product page', () => {
     mockedGet.mockResolvedValueOnce({ data: product } as never)
     mockedUseAuth.mockReturnValue({
       authAxios,
-      token: null
+      user: null,
+      authReady: true
     } as unknown as ReturnType<typeof useAuth>)
     renderProduct()
     await screen.findByRole('heading', { name: product.title })

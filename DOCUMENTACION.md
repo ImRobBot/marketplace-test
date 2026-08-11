@@ -1,447 +1,75 @@
 # Documentación técnica de Mercado Uno
 
-## 1. Descripción
-
-Mercado Uno es un marketplace full stack de demostración. Permite registrar usuarios, iniciar sesión, consultar productos, administrar un carrito, completar una compra simulada y cancelar una orden desde la API.
-
-El proyecto tiene fines educativos y de desarrollo local. El checkout marca las órdenes como pagadas sin conectarse a una pasarela de pago y la interfaz comunica que no se realizan cargos reales.
-
-## 2. Alcance funcional
-
-La versión actual incluye:
-
-- Catálogo y detalle de productos.
-- Búsqueda por texto y categorías visuales.
-- Registro e inicio de sesión con JWT.
-- Carrito persistido por usuario.
-- Modificación y eliminación de artículos.
-- Verificación de inventario durante el checkout.
-- Creación transaccional de órdenes e ítems de orden.
-- Cancelación de órdenes desde la API con restauración de inventario.
-- Interfaz responsive inspirada en un marketplace de gran escala.
-- Pruebas automatizadas de los flujos principales.
-- Contrato [OpenAPI 3.0](./openapi.yaml).
-
-No incluye pagos reales, direcciones, cálculo de envío, impuestos, historial de órdenes en la interfaz ni administración de productos.
-
-## 3. Arquitectura
+## Arquitectura
 
 ```text
-┌──────────────────────────────┐
-│ Navegador                    │
-│ React + React Router + Axios │
-└──────────────┬───────────────┘
-               │ http://localhost:3000
-               │ HTTP/JSON + JWT Bearer
-               ▼
-┌──────────────────────────────┐
-│ API REST                     │
-│ Express + TypeScript         │
-└──────────────┬───────────────┘
-               │ http://localhost:4000
-               │ Sequelize
-               ▼
-┌──────────────────────────────┐
-│ SQLite                       │
-│ data/database.sqlite         │
-└──────────────────────────────┘
+Navegador/Postman
+       |
+       v
+Nginx :3000  -- /api -->  Express :4000  --> PostgreSQL 18
+       |                     |
+       +-- React SPA         +-- migraciones SequelizeMeta
+                             +-- importador SQLite (solo lectura)
 ```
 
-El repositorio no usa un `package.json` raíz ni workspaces. `backend` y `frontend` se instalan, ejecutan y validan por separado.
-
-### Tecnologías
-
-| Capa | Tecnologías principales |
-|---|---|
-| Frontend | React 18, TypeScript, Vite 5, React Router 6, Axios |
-| Estilos | CSS responsive por capas en `src/styles/legacy` y `src/styles/theme` |
-| Backend | Express 4, TypeScript, JWT, bcryptjs |
-| Persistencia | Sequelize 6 y SQLite 3 |
-| Pruebas backend | Jest, ts-jest y Supertest |
-| Pruebas frontend | Vitest, Testing Library y jsdom |
-
-## 4. Estructura del repositorio
-
-```text
-marketplace/
-├── README.md
-├── DOCUMENTACION.md
-├── openapi.yaml
-├── backend/
-│   ├── data/
-│   │   ├── .gitkeep
-│   │   └── database.sqlite       # local, ignorada por Git
-│   ├── src/
-│   │   ├── app.ts                # Express, rutas públicas y seed
-│   │   ├── data/productCatalog.ts # catálogo local de 100 productos
-│   │   ├── index.ts              # inicialización y listener HTTP
-│   │   ├── middleware/auth.ts     # autenticación JWT
-│   │   ├── models/                # modelos y relaciones Sequelize
-│   │   ├── routes/auth.ts         # registro e inicio de sesión
-│   │   ├── routes/cart.ts         # carrito, checkout y cancelación
-│   │   └── scripts/seedProducts.ts # sincronización transaccional del catálogo
-│   ├── tests/
-│   ├── .env.example
-│   └── package.json
-└── frontend/
-    ├── src/
-    │   ├── app/                   # providers, shell y definición de rutas
-    │   ├── components/
-    │   │   ├── auth/              # formularios y presentación de acceso
-    │   │   ├── cart/              # artículos, cantidad y resumen de compra
-    │   │   ├── common/            # marca, avisos y estados vacíos
-    │   │   ├── home/              # hero, departamentos, catálogo y tarjetas
-    │   │   ├── layout/            # header, búsqueda, navegación y footer
-    │   │   └── product/           # detalle, compra y visual del producto
-    │   ├── context/AuthContext.tsx
-    │   ├── data/                  # constantes tipadas de navegación y catálogo
-    │   ├── hooks/                 # estado reutilizable sin marcado JSX
-    │   ├── lib/                   # funciones puras de catálogo, carrito y auth
-    │   ├── pages/                 # contenedores de estado y llamadas a la API
-    │   ├── styles/
-    │   │   ├── legacy/            # base estructural separada por dominio
-    │   │   ├── theme/             # capa visual separada por dominio
-    │   │   └── index.css          # entrada única; preserva el orden de cascada
-    │   └── main.tsx               # montaje mínimo de React
-    ├── index.html                 # único documento HTML host
-    ├── vite.config.ts
-    └── package.json
-```
-
-El marcado de cada componente React vive en su archivo `.tsx`; `index.html` solo contiene el documento host y el elemento `#root`. La lógica que no genera interfaz se mantiene en archivos `.ts`. Los estilos se cargan desde `styles/index.css`: primero la base estructural completa y después el tema visual completo para conservar la cascada original.
-
-## 5. Requisitos
-
-- Node.js y pnpm instalados. El entorno usado durante el desarrollo ejecuta Node.js 24.
-- pnpm 9, activado mediante Corepack (`corepack enable`).
-- Dos terminales para trabajar con frontend y backend simultáneamente.
-- Un navegador moderno.
-- Opcional: una herramienta compatible con SQLite para inspeccionar la base de datos.
-
-No se requiere instalar un servidor de base de datos externo.
-
-## 6. Instalación
-
-Desde la raíz del proyecto:
-
-### Backend
-
-```powershell
-cd backend
-pnpm install --frozen-lockfile
-Copy-Item .env.example .env
-```
-
-En Linux o macOS, sustituye `Copy-Item` por:
-
-```bash
-cp .env.example .env
-```
-
-Edita `.env` y reemplaza `JWT_SECRET` antes de compartir o desplegar la aplicación.
-
-### Frontend
-
-```powershell
-cd ..\frontend
-pnpm install --frozen-lockfile
-```
-
-## 7. Configuración
+El proxy de mismo origen simplifica cookies y permite una CSP `connect-src 'self'`. En desarrollo, Vite realiza el mismo proxy. La API directa en `:4000` se conserva para diagnóstico.
 
-### Variables del backend
+## Persistencia
 
-| Variable | Valor predeterminado | Uso |
-|---|---:|---|
-| `PORT` | `4000` | Puerto HTTP de Express. |
-| `JWT_SECRET` | Fallback interno `secret` | Firma y validación de JWT. Debe configurarse con un valor robusto fuera de una demo. |
-| `DB_STORAGE` | `data/database.sqlite` | Ruta del archivo SQLite. Acepta `:memory:` para una base efímera. |
+Fuera de tests, `DATABASE_URL` es obligatoria y el dialecto siempre es PostgreSQL. El arranque autentica la conexión y ejecuta, en orden, las migraciones registradas en `SequelizeMeta`. No se usa sincronización automática de esquema en producción.
 
-Archivo de ejemplo: [`backend/.env.example`](./backend/.env.example).
+Tablas principales:
 
-El frontend consume actualmente `http://localhost:4000` desde `AuthContext.tsx`; todavía no existe una variable `VITE_API_URL`.
+- `Users`: credenciales con bcrypt (coste 12).
+- `Products`: catálogo, precio `DECIMAL(12,2)` y stock.
+- `CartItems`: líneas únicas por usuario/producto.
+- `Orders`: estado, total decimal, clave idempotente e `inventoryReleasedAt`.
+- `OrderItems`: snapshot de cantidad/precio por pedido.
+- `Payments`: un registro por pedido, importe entero en centavos y estado separado.
 
-## 8. Ejecución local
+SQLite queda limitada a Jest (`:memory:`) y al origen del importador. El driver no forma parte de la imagen de runtime.
 
-### Terminal 1: backend
+## Checkout transaccional
 
-```powershell
-cd backend
-pnpm run dev
-```
+1. Valida `Idempotency-Key`; si ya existe para el usuario, devuelve el pedido previo.
+2. Bloquea las líneas y productos del carrito.
+3. Verifica stock y calcula centavos desde precios persistidos.
+4. Descuenta inventario, crea `Order.pending_payment`, sus líneas y `Payment.pending`.
+5. Vacía el carrito y confirma la transacción.
 
-Para cargar los 100 productos realistas antes de iniciar la API por primera vez:
+Una violación concurrente de la clave única revierte toda la segunda transacción y reutiliza la primera orden. El alias `orderId` se conserva en checkout, pero el objeto `order` es el contrato principal.
 
-```powershell
-pnpm run seed:products
-```
+## Pago y cancelación
 
-El comando puede repetirse: conserva IDs y stock de los productos existentes, completa los faltantes y valida que el catálogo administrado contenga exactamente 100 registros.
+El pago simulado bloquea pedido y pago. Solo `pending_payment/pending` puede transicionar a `paid/paid` o `payment_failed/failed`; repetir una transición terminal devuelve el mismo resultado. En `NODE_ENV=production` el endpoint responde 503.
 
-### Terminal 2: frontend
+Cancelar bloquea pedido, líneas, pago y productos. La primera solicitud repone inventario y escribe `inventoryReleasedAt`; las siguientes no repiten efectos. Un pago pendiente/fallido pasa a `cancelled`; uno pagado se representa como `refunded` dentro de la simulación.
 
-```powershell
-cd frontend
-pnpm run dev
-```
+## Autenticación
 
-Direcciones:
+- JWT firmado exclusivamente con HS256, vigencia de siete días.
+- Cookie HttpOnly `mercado_session`; en producción, `__Host-mercado_session` + `Secure`.
+- `SameSite=Lax`, `Path=/` y CORS con credenciales/origen exacto.
+- Mutaciones con cookie validan `Origin` cuando el navegador lo envía.
+- Bearer se prioriza si está presente, para clientes existentes.
+- El frontend borra tokens heredados y restaura sesión con `/api/auth/me`.
 
-| Servicio | URL |
-|---|---|
-| Frontend | <http://localhost:3000> |
-| API | <http://localhost:4000> |
-| Salud | <http://localhost:4000/api/health> |
-| Catálogo JSON | <http://localhost:4000/api/products> |
+## Controles de seguridad
 
-En Windows, si pnpm no está disponible, ejecuta `corepack enable` y vuelve a abrir la terminal.
+- JSON estricto limitado a 10 KiB y 413 uniforme.
+- Rate limit global antes del parser y límite reforzado en autenticación.
+- IDs, credenciales, cantidades y estados validados.
+- Errores internos genéricos; logs sin cuerpo, stack, Authorization ni cookies.
+- `X-Powered-By` deshabilitado; API y frontend aplican headers defensivos.
+- CSP del frontend restringida a recursos/conexiones del mismo origen.
+- Auditoría de dependencias bloquea severidad moderada o superior en CI.
 
-## 9. Scripts disponibles
+El rate limit en memoria no coordina réplicas; para escalar debe sustituirse por un almacén compartido.
 
-### Backend
+## CI
 
-| Comando | Descripción |
-|---|---|
-| `pnpm run dev` | Ejecuta `src/index.ts` con recarga automática mediante `tsx watch`. |
-| `pnpm run seed:products` | Sincroniza de forma transaccional los 100 productos del catálogo local. |
-| `pnpm run typecheck` | Valida TypeScript sin generar archivos. |
-| `pnpm test` | Ejecuta Jest en serie y usa SQLite en memoria. |
-| `pnpm run build` | Compila `src` hacia `dist`. |
-| `pnpm start` | Ejecuta `dist/index.js`. Requiere un build previo. |
+GitHub Actions instala con lockfile congelado, audita dependencias, migra un PostgreSQL 18 real, ejecuta typecheck/cobertura/build, construye ambos contenedores y hace smoke tests de API, frontend y CSP. SonarCloud solo se ejecuta cuando existe `SONAR_TOKEN`.
 
-### Frontend
+## Límites explícitos
 
-| Comando | Descripción |
-|---|---|
-| `pnpm run dev` | Inicia Vite en el puerto 3000. |
-| `pnpm run typecheck` | Valida TypeScript sin generar archivos. |
-| `pnpm test` | Ejecuta Vitest una vez. |
-| `pnpm run build` | Valida TypeScript y genera `dist`. |
-| `pnpm run preview` | Sirve localmente el build de Vite. |
-
-## 10. Rutas del frontend
-
-| Ruta | Página | Acceso |
-|---|---|---|
-| `/` | Inicio, categorías, búsqueda y catálogo | Público |
-| `/product/:id` | Detalle de producto y selector de cantidad | Público; comprar requiere sesión |
-| `/cart` | Carrito y checkout simulado | La página es pública; los datos requieren sesión |
-| `/login` | Inicio de sesión | Público |
-| `/register` | Registro | Público |
-| Cualquier otra | Estado 404 del frontend | Público |
-
-La búsqueda global utiliza el parámetro `q`, por ejemplo `/?q=Producto`.
-
-## 11. API REST
-
-La especificación completa y procesable se encuentra en [`openapi.yaml`](./openapi.yaml).
-
-Resumen de endpoints:
-
-| Método | Ruta | Autenticación | Descripción |
-|---|---|---|---|
-| `GET` | `/api/health` | No | Estado de la API. |
-| `GET` | `/api/products` | No | Lista el catálogo. |
-| `GET` | `/api/products/{id}` | No | Obtiene un producto. |
-| `POST` | `/api/auth/register` | No | Crea un usuario y devuelve JWT. |
-| `POST` | `/api/auth/login` | No | Valida credenciales y devuelve JWT. |
-| `GET` | `/api/cart` | Bearer JWT | Consulta el carrito. |
-| `POST` | `/api/cart` | Bearer JWT | Añade o acumula un producto. |
-| `PUT` | `/api/cart` | Bearer JWT | Reemplaza una cantidad. |
-| `DELETE` | `/api/cart/{productId}` | Bearer JWT | Elimina un producto. |
-| `POST` | `/api/checkout` | Bearer JWT | Completa el checkout simulado. |
-| `POST` | `/api/orders/{orderId}/cancel` | Bearer JWT | Cancela una orden y restaura stock. |
-
-### Autenticación
-
-Registro e inicio de sesión devuelven un token con una vigencia de siete días:
-
-```json
-{
-  "token": "<jwt>",
-  "user": {
-    "id": 1,
-    "username": "demo"
-  }
-}
-```
-
-En rutas protegidas se envía:
-
-```http
-Authorization: Bearer <jwt>
-```
-
-El frontend conserva el token y el usuario en `localStorage`; el interceptor de Axios añade la cabecera.
-
-## 12. Persistencia y modelo de datos
-
-La base local se guarda en:
-
-```text
-backend/data/database.sqlite
-```
-
-El archivo está ignorado por Git. En `NODE_ENV=test` el backend usa SQLite en memoria y no modifica la base local.
-
-Sequelize ejecuta `sync()` al iniciar. Si no existen productos, inserta dos registros de demostración.
-
-### Entidades
-
-| Entidad | Campos principales |
-|---|---|
-| `User` | `id`, `username` único, `passwordHash`, timestamps |
-| `Product` | `id`, `title`, `description`, `price`, `stock`, timestamps |
-| `CartItem` | `id`, `qty`, `UserId`, `ProductId`, timestamps |
-| `Order` | `id`, `status`, `total`, `UserId`, timestamps |
-| `OrderItem` | `id`, `qty`, `price`, `OrderId`, `ProductId`, timestamps |
-
-Relaciones:
-
-```text
-User    1 ── N Order
-User    1 ── N CartItem
-Product 1 ── N CartItem
-Product 1 ── N OrderItem
-Order   1 ── N OrderItem
-```
-
-`OrderItem.price` conserva el precio utilizado al crear la orden, aunque el producto cambie después.
-
-## 13. Flujos principales
-
-### Registro e inicio de sesión
-
-1. El frontend envía usuario y contraseña.
-2. El backend crea o localiza el usuario.
-3. bcrypt genera o compara el hash de contraseña.
-4. El backend firma un JWT con `sub`, `username` y expiración de siete días.
-5. El frontend guarda sesión y añade el token a las solicitudes protegidas.
-
-### Carrito
-
-1. Un usuario autenticado añade un producto.
-2. Si ya existe en el carrito, `POST /api/cart` acumula la cantidad.
-3. `PUT /api/cart` reemplaza la cantidad.
-4. `DELETE /api/cart/{productId}` elimina el registro y es idempotente.
-
-### Checkout simulado
-
-1. El backend abre una transacción SQLite.
-2. Carga el carrito y sus productos.
-3. Comprueba el stock y recalcula el total desde la base de datos.
-4. Descuenta inventario.
-5. Crea una orden con estado `paid` y sus `OrderItem`.
-6. Vacía el carrito y confirma la transacción.
-
-No existe integración con tarjetas ni proveedor de pagos.
-
-### Cancelación
-
-`POST /api/orders/{orderId}/cancel` solo opera sobre una orden del usuario autenticado. Restaura inventario, cambia el estado a `cancelled` y devuelve éxito si la orden ya estaba cancelada.
-
-## 14. Pruebas
-
-### Backend
-
-La suite contiene pruebas de integración para:
-
-- Registro e inicio de sesión.
-- Checkout, creación de orden y descuento de stock.
-- Cancelación y restauración de stock.
-
-### Frontend
-
-La suite verifica:
-
-- Renderizado de productos obtenidos desde la API.
-- Filtrado del catálogo a partir de `?q=`.
-
-Validación recomendada antes de confirmar cambios:
-
-```powershell
-# Dentro de backend
-pnpm run typecheck
-pnpm test
-pnpm run build
-
-# Dentro de frontend
-pnpm run typecheck
-pnpm test
-pnpm run build
-```
-
-## 15. Build y ejecución compilada
-
-### Backend
-
-```powershell
-cd backend
-pnpm run build
-pnpm start
-```
-
-### Frontend
-
-```powershell
-cd frontend
-pnpm run build
-pnpm run preview
-```
-
-Vite genera el frontend en `frontend/dist`; TypeScript genera el backend en `backend/dist`. Ambos directorios están ignorados por Git.
-
-## 16. Seguridad y limitaciones conocidas
-
-Antes de utilizar el proyecto con usuarios o dinero reales se debe considerar lo siguiente:
-
-- El checkout es simulado y crea órdenes directamente como `paid`.
-- `JWT_SECRET` tiene un fallback inseguro para facilitar la demo.
-- El frontend guarda el JWT en `localStorage`, lo que exige una estrategia estricta contra XSS.
-- CORS está habilitado sin restringir orígenes.
-- Las cantidades no se validan rigurosamente como enteros positivos en todas las rutas.
-- Los precios y totales usan números de punto flotante; producción debería usar enteros en centavos o un tipo decimal.
-- SQLite y `sequelize.sync()` son apropiados para la demo, pero no sustituyen migraciones y una base preparada para concurrencia.
-- No hay limitación de intentos, recuperación de contraseña, verificación de correo ni rotación de tokens.
-- No existe un manejador JSON global para rutas desconocidas y errores asíncronos.
-
-Para pagos reales se requiere una pasarela tokenizada, órdenes con estados intermedios, idempotencia, webhooks firmados, reservas de inventario y reembolsos.
-
-## 17. Solución de problemas
-
-### El catálogo no carga
-
-1. Confirma que el backend responde en <http://localhost:4000/api/health>.
-2. Revisa que el frontend esté usando el puerto 3000.
-3. Consulta los logs del backend.
-
-### El puerto está ocupado
-
-En PowerShell:
-
-```powershell
-Get-NetTCPConnection -State Listen | Where-Object LocalPort -in 3000,4000
-```
-
-Cierra únicamente el proceso que corresponda al proyecto o configura otro puerto.
-
-### Error de autenticación
-
-- Comprueba que frontend y backend utilicen la misma sesión.
-- Revisa la vigencia del JWT.
-- Si cambiaste `JWT_SECRET`, los tokens firmados previamente dejan de ser válidos.
-
-### Reiniciar los datos locales
-
-Detén primero el backend. El archivo `backend/data/database.sqlite` contiene todos los usuarios, carritos, órdenes y productos locales. Haz una copia antes de reemplazarlo o eliminarlo.
-
-## 18. Mantenimiento del contrato API
-
-Cuando cambie una ruta, petición, respuesta o código HTTP:
-
-1. Actualiza la implementación y sus pruebas.
-2. Actualiza [`openapi.yaml`](./openapi.yaml).
-3. Valida el YAML con una herramienta compatible con OpenAPI 3.0.
-4. Actualiza esta documentación si cambia un flujo público.
-
-El contrato describe el comportamiento actual; no documenta endpoints de pagos futuros ni validaciones que todavía no estén implementadas.
+No hay proveedor de pago real, captura de tarjeta/CVV, webhooks, conciliación, direcciones, impuestos ni envíos. Para producción se necesita integrar un proveedor externo mediante tokens y webhooks firmados, observabilidad, backups y rate limit distribuido.

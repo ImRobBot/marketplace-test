@@ -35,9 +35,14 @@ afterEach(cleanup)
 
 beforeEach(() => {
   vi.clearAllMocks()
+  authGet.mockReset()
+  authPost.mockReset()
+  authPut.mockReset()
+  authDelete.mockReset()
   mockedUseAuth.mockReturnValue({
     authAxios,
-    token: 'token'
+    user: { id: 1, username: 'alice' },
+    authReady: true
   } as unknown as ReturnType<typeof useAuth>)
   authGet.mockResolvedValue({ data: [] })
 })
@@ -54,7 +59,8 @@ describe('Cart page', () => {
   it('shows login actions to unauthenticated visitors', () => {
     mockedUseAuth.mockReturnValue({
       authAxios,
-      token: null
+      user: null,
+      authReady: true
     } as unknown as ReturnType<typeof useAuth>)
 
     renderCart()
@@ -100,11 +106,23 @@ describe('Cart page', () => {
 
     cleanup()
     authGet.mockReset().mockResolvedValueOnce({ data: [item] })
-    authPost.mockResolvedValueOnce({ data: { ok: true } })
+    authPost
+      .mockResolvedValueOnce({ data: { order: { id: 42, status: 'pending_payment' } } })
+      .mockResolvedValueOnce({ data: { order: { id: 42, status: 'paid' } } })
     renderCart()
     await screen.findByRole('heading', { name: item.product!.title })
     fireEvent.click(screen.getByRole('button', { name: /pagar ahora/i }))
-    await waitFor(() => expect(authPost).toHaveBeenCalledWith('/api/checkout'))
+    await waitFor(() => expect(authPost).toHaveBeenNthCalledWith(
+      1,
+      '/api/checkout',
+      undefined,
+      { headers: { 'Idempotency-Key': expect.any(String) } }
+    ))
+    expect(authPost).toHaveBeenNthCalledWith(
+      2,
+      '/api/orders/42/pay',
+      { outcome: 'paid' }
+    )
     expect(await screen.findByText(/compra simulada completada/i)).toBeInTheDocument()
   })
 
@@ -114,7 +132,8 @@ describe('Cart page', () => {
     authDelete.mockRejectedValueOnce(new Error('delete failed'))
     authPost
       .mockRejectedValueOnce({ response: { data: { error: 'Insufficient stock for Producto A' } } })
-      .mockRejectedValueOnce(new Error('checkout failed'))
+      .mockResolvedValueOnce({ data: { order: { id: 7, status: 'pending_payment' } } })
+      .mockRejectedValueOnce(new Error('payment failed'))
     mockedIsAxiosError.mockReturnValueOnce(true).mockReturnValueOnce(false)
 
     renderCart()
@@ -130,6 +149,18 @@ describe('Cart page', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/suficiente stock/i)
 
     fireEvent.click(screen.getByRole('button', { name: /pagar ahora/i }))
+    expect(await screen.findByRole('alert')).toHaveTextContent(/pedido.*pago.*pendiente/i)
+  })
+
+  it('rejects a malformed checkout response without attempting payment', async () => {
+    authGet.mockReset().mockResolvedValueOnce({ data: [item] })
+    authPost.mockResolvedValueOnce({ data: { order: { id: 0, status: 'pending_payment' } } })
+
+    renderCart()
+    await screen.findByRole('heading', { name: item.product!.title })
+    fireEvent.click(screen.getByRole('button', { name: /pagar ahora/i }))
+
     expect(await screen.findByRole('alert')).toHaveTextContent(/no pudimos completar/i)
+    expect(authPost).toHaveBeenCalledTimes(1)
   })
 })

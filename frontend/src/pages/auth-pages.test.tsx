@@ -10,10 +10,10 @@ import Register from './Register'
 
 vi.mock('axios', () => ({
   default: {
+    get: vi.fn(),
     post: vi.fn(),
     isAxiosError: vi.fn(),
     create: vi.fn(() => ({
-      interceptors: { request: { use: vi.fn() } },
       get: vi.fn(),
       post: vi.fn(),
       put: vi.fn(),
@@ -23,6 +23,7 @@ vi.mock('axios', () => ({
 }))
 
 const mockedPost = vi.mocked(axios.post)
+const mockedGet = vi.mocked(axios.get)
 const mockedIsAxiosError = vi.mocked(axios.isAxiosError)
 
 afterEach(cleanup)
@@ -30,6 +31,7 @@ afterEach(cleanup)
 beforeEach(() => {
   localStorage.clear()
   vi.clearAllMocks()
+  mockedGet.mockRejectedValue(new Error('no active session'))
 })
 
 function renderAuthPage(page: React.ReactNode, initialEntries: string[] = ['/login']) {
@@ -55,7 +57,7 @@ function submitForm(buttonName: string) {
 describe('authentication pages', () => {
   it('logs in with trimmed username and honors the previous route', async () => {
     mockedPost.mockResolvedValueOnce({
-      data: { token: 'token', user: { id: 1, username: 'alice' } }
+      data: { user: { id: 1, username: 'alice' } }
     } as never)
 
     renderAuthPage(<Login />, ['/login'])
@@ -64,8 +66,9 @@ describe('authentication pages', () => {
     submitForm('Entrar')
 
     await waitFor(() => expect(mockedPost).toHaveBeenCalledWith(
-      'http://localhost:4000/api/auth/login',
-      { username: 'alice', password: 'secret123456' }
+      '/api/auth/login',
+      { username: 'alice', password: 'secret123456' },
+      { withCredentials: true }
     ))
     expect(await screen.findByText('Destino inicio')).toBeInTheDocument()
   })
@@ -84,7 +87,7 @@ describe('authentication pages', () => {
 
   it('registers a user and navigates to the home page', async () => {
     mockedPost.mockResolvedValueOnce({
-      data: { token: 'token', user: { id: 2, username: 'bob' } }
+      data: { user: { id: 2, username: 'bob' } }
     } as never)
 
     renderAuthPage(<Register />, ['/register'])
@@ -93,8 +96,9 @@ describe('authentication pages', () => {
     submitForm('Crear cuenta')
 
     await waitFor(() => expect(mockedPost).toHaveBeenCalledWith(
-      'http://localhost:4000/api/auth/register',
-      { username: 'bob', password: 'secret123456' }
+      '/api/auth/register',
+      { username: 'bob', password: 'secret123456' },
+      { withCredentials: true }
     ))
     expect(await screen.findByText('Destino inicio')).toBeInTheDocument()
   })

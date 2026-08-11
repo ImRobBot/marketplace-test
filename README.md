@@ -1,49 +1,46 @@
 # Mercado Uno
 
-Marketplace de demostración construido con React, Express, TypeScript y SQLite. Incluye catálogo, autenticación con JWT, carrito, checkout simulado, control de inventario y cancelación de órdenes mediante una API REST.
+Marketplace educativo full stack con React, Express, Sequelize y PostgreSQL. La aplicación incluye catálogo, sesión por cookie HttpOnly, carrito, pedidos idempotentes y un proveedor de pagos simulado que nunca recibe datos bancarios.
 
-> [!IMPORTANT]
-> El checkout es una simulación educativa. No solicita datos bancarios ni realiza cargos reales.
+## Arranque recomendado
 
-## Documentación
-
-- [Documentación integral del proyecto](./DOCUMENTACION.md)
-- [Contrato OpenAPI 3.0 en YAML](./openapi.yaml)
-- [Guía específica del backend](./backend/README.md)
-- [Guía específica del frontend](./frontend/README.md)
-
-## Arquitectura
-
-```text
-Navegador
-   │
-   ▼
-React + Vite :3000
-   │ HTTP/JSON
-   ▼
-Express :4000
-   │ Sequelize
-   ▼
-SQLite (backend/data/database.sqlite)
-```
-
-El frontend y el backend son módulos independientes: cada uno tiene su propio `package.json`, dependencias y comandos.
-
-## Inicio rápido
-
-### Backend
+Requisitos: Docker Desktop con Compose v2. PostgreSQL 18, API y frontend se levantan juntos.
 
 ```powershell
+Copy-Item .env.example .env
+# Cambia JWT_SECRET y POSTGRES_PASSWORD en .env
+docker compose up --build --detach --wait
+```
+
+- Aplicación y API por proxy de mismo origen: `http://localhost:3000`
+- API directa: `http://localhost:4000/api/health`
+- PostgreSQL local: `localhost:5432`
+
+Si una descarga o healthcheck transitorio falla, reintenta una vez:
+
+```powershell
+docker compose up --build --detach --wait
+docker compose ps
+docker compose logs --no-color
+```
+
+Para detener sin borrar la base: `docker compose down`. Para eliminar también el volumen local: `docker compose down --volumes` (destructivo).
+
+> El equipo actual donde se preparó esta rama no tiene Docker instalado; el stack completo se valida en el job `Compose smoke test` de CI.
+
+## Desarrollo sin contenedores
+
+Requisitos: Node.js 22, pnpm 11 y PostgreSQL accesible.
+
+```powershell
+Copy-Item backend/.env.example backend/.env
 cd backend
 pnpm install --frozen-lockfile
-Copy-Item .env.example .env
-pnpm run seed:products
+pnpm run migrate
 pnpm run dev
 ```
 
-### Frontend
-
-En una segunda terminal:
+En otra terminal:
 
 ```powershell
 cd frontend
@@ -51,22 +48,57 @@ pnpm install --frozen-lockfile
 pnpm run dev
 ```
 
-Servicios locales:
+Vite publica `http://localhost:3000` y redirige `/api` a `http://localhost:4000`. `VITE_API_URL` solo es necesario cuando no existe un proxy de mismo origen.
 
-- Aplicación: <http://localhost:3000>
-- API: <http://localhost:4000>
-- Salud de la API: <http://localhost:4000/api/health>
+## Migrar la SQLite anterior
 
-Si pnpm no está disponible, habilítalo con Corepack: `corepack enable`.
-
-## Verificación
-
-Ejecuta estos comandos dentro de `backend` y después dentro de `frontend`:
+El importador abre el origen en modo de solo lectura, exige un PostgreSQL destino vacío, conserva IDs y ajusta secuencias. No elimina ni modifica `backend/data/database.sqlite`.
 
 ```powershell
+cd backend
+$env:DATABASE_URL='postgresql://marketplace:password@localhost:5432/marketplace'
+$env:SQLITE_SOURCE='data/database.sqlite'
+pnpm run migrate
+pnpm run migrate:sqlite-to-postgres
+```
+
+Haz un respaldo del origen y verifica los conteos antes de cambiar tráfico.
+
+## Contrato funcional
+
+- `POST /api/checkout` crea `Order.pending_payment`, reserva stock y crea `Payment.pending`.
+- `Idempotency-Key` (8–128 caracteres) permite reintentar checkout sin duplicar orden, pago o reserva.
+- `POST /api/orders/{id}/pay` simula `paid` o `failed` solo fuera de producción.
+- `GET /api/orders` y `GET /api/orders/{id}` aíslan los datos por propietario.
+- Cancelar es idempotente y `inventoryReleasedAt` impide devolver inventario dos veces.
+- El frontend usa una cookie HttpOnly; Bearer solo se conserva para clientes compatibles habilitados explícitamente.
+
+No existe cobro real, almacenamiento de tarjeta, CVV, webhook ni reembolso externo.
+
+## Calidad y seguridad
+
+```powershell
+cd backend
 pnpm run typecheck
 pnpm test
 pnpm run build
+pnpm audit --prod --audit-level moderate
+
+cd ../frontend
+pnpm run typecheck
+pnpm test
+pnpm run build
+pnpm audit --audit-level moderate
 ```
 
-Consulta [DOCUMENTACION.md](./DOCUMENTACION.md) para instalación detallada, estructura, modelo de datos, rutas, seguridad, resolución de problemas y operación del proyecto.
+CI añade una instancia PostgreSQL real, ejecuta migraciones, cobertura, builds, auditorías y un smoke test de Compose. Las imágenes excluyen `sqlite3` del runtime, el proxy aplica CSP y la API limita JSON a 10 KiB, redacta cookies/Authorization y no registra cuerpos crudos.
+
+## Documentación
+
+- [Arquitectura y operación](./DOCUMENTACION.md)
+- [Guía DevOps](./DEVOPS-GUIA-PRACTICA.md)
+- [Backend](./backend/README.md)
+- [Frontend](./frontend/README.md)
+- [OpenAPI](./openapi.yaml)
+- [ADR PostgreSQL/pedidos/pagos](./docs/decisions/ADR-001-postgresql-orders-payments.md)
+- [Colección Postman](./postman/MercadoUno.postman_collection.json)

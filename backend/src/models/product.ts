@@ -32,7 +32,7 @@ export function initProductModel(sequelize: Sequelize): typeof Product {
         allowNull: true
       },
       price: {
-        type: DataTypes.FLOAT,
+        type: DataTypes.DECIMAL(12, 2),
         allowNull: false,
         defaultValue: 0
       },

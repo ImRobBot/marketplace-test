@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { getRedirectTarget } from './auth'
 import { calculateCartSummary, getCartProduct, getMaximumStock } from './cart'
 import { filterProducts } from './catalog'
+import { createIdempotencyKey } from './idempotency'
 import { clampQuantity } from './quantity'
 import { formatPrice, getProductDescription, getProductMeta } from './products'
 import type { Product } from '../types'
@@ -16,8 +17,34 @@ describe('domain utilities', () => {
   it('validates redirect targets', () => {
     expect(getRedirectTarget({ from: '/cart' })).toBe('/cart')
     expect(getRedirectTarget({ from: 'https://evil.example' })).toBe('/')
+    expect(getRedirectTarget({ from: '//evil.example' })).toBe('/')
+    expect(getRedirectTarget({ from: '/\\evil.example' })).toBe('/')
     expect(getRedirectTarget(null)).toBe('/')
     expect(getRedirectTarget({})).toBe('/')
+  })
+
+  it('creates idempotency keys from cryptographically secure randomness', () => {
+    const uuidCrypto = {
+      randomUUID: () => '123e4567-e89b-12d3-a456-426614174000'
+    } as unknown as Crypto
+    expect(createIdempotencyKey(uuidCrypto)).toBe('123e4567-e89b-12d3-a456-426614174000')
+
+    const byteCrypto = {
+      getRandomValues: (bytes: Uint8Array) => {
+        bytes.set(Array.from({ length: bytes.length }, (_, index) => index))
+        return bytes
+      }
+    } as unknown as Crypto
+    expect(createIdempotencyKey(byteCrypto)).toBe(
+      'checkout-000102030405060708090a0b0c0d0e0f'
+    )
+  })
+
+  it('fails closed when secure randomness is unavailable', () => {
+    expect(() => createIdempotencyKey(null)).toThrow(TypeError)
+    expect(() => createIdempotencyKey(null)).toThrow(
+      'Secure random generation is unavailable'
+    )
   })
 
   it('calculates cart summaries and product fallbacks', () => {

@@ -6,7 +6,7 @@ import CategoryNav from './CategoryNav'
 import HeaderSearch from './HeaderSearch'
 
 export default function SiteHeader() {
-  const { user, token, logout } = useAuth()
+  const { user, logout } = useAuth()
   const { query, setQuery, submitSearch } = useHeaderSearch()
 
   return (
@@ -33,14 +33,14 @@ export default function SiteHeader() {
           <HeaderSearch query={query} onQueryChange={setQuery} onSubmit={submitSearch} />
 
           <div className="header-actions">
-            {token ? (
+            {user ? (
               <div className="header-account header-account--signed-in">
                 <span className="user-chip__avatar" aria-hidden="true">
                   {(user?.username || 'U').slice(0, 1).toUpperCase()}
                 </span>
                 <span className="header-account__copy">
                   <small>Hola, {user?.username || 'usuario'}</small>
-                  <button type="button" onClick={logout}>Cerrar sesión</button>
+                  <button type="button" onClick={() => void logout()}>Cerrar sesión</button>
                 </span>
               </div>
             ) : (
